@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.log
 .env
+# esbuild output (only used for local manual testing — Netlify builds it)
+bundle.js
