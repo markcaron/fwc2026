@@ -16,6 +16,7 @@
 
 import { build } from 'esbuild';
 import fs from 'node:fs';
+import sharp from 'sharp';
 
 // ── Clean and scaffold output dir ────────────────────────────
 fs.rmSync('dist', { recursive: true, force: true });
@@ -40,6 +41,18 @@ console.log('✓ Copied src/tokens.css');
 // ── 3. Copy public assets ────────────────────────────────────
 fs.cpSync('public', 'dist/public', { recursive: true });
 console.log('✓ Copied public/');
+
+// ── 3a. Generate apple-touch-icon.png from favicon.svg ───────
+// iOS/Safari requires a 180×180 PNG for home-screen icons.
+// We render the same SVG used for the browser favicon.
+await sharp(
+  Buffer.from(fs.readFileSync('public/favicon.svg', 'utf8')),
+  { density: 72 }           // 72 dpi → crisp render at 180×180 px
+)
+  .resize(180, 180)
+  .png()
+  .toFile('dist/public/apple-touch-icon.png');
+console.log('✓ Generated apple-touch-icon.png (180×180)');
 
 // ── 4. Patch index.html ──────────────────────────────────────
 let html = fs.readFileSync('index.html', 'utf8');
