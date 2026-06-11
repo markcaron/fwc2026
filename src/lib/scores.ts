@@ -9,8 +9,10 @@ import type { Match } from './types.js';
  * decided on penalties.
  */
 export interface ScoreEntry {
-  home:          number;
-  away:          number;
+  /** Score values are optional — a live match may have status:'live' before
+   *  the API populates a score (free-tier delay, early first half, etc.) */
+  home?:         number;
+  away?:         number;
   status?:       'live' | 'completed';
   homePenalty?:  number;
   awayPenalty?:  number;
@@ -75,11 +77,11 @@ export function applyScores(
     if (!s) return m;
     return {
       ...m,
-      homeScore:    s.home,
-      awayScore:    s.away,
-      status:       s.status ?? 'completed',
-      homePenalty:  s.homePenalty  ?? null,
-      awayPenalty:  s.awayPenalty  ?? null,
+      homeScore:    s.home    ?? null,  // null when score not yet available (live)
+      awayScore:    s.away    ?? null,
+      status:       s.status  ?? 'completed',
+      homePenalty:  s.homePenalty ?? null,
+      awayPenalty:  s.awayPenalty ?? null,
     };
   });
 }

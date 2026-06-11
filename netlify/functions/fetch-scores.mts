@@ -225,7 +225,7 @@ export default async function handler(): Promise<Response> {
 
   // Build the scores payload in our format
   const scores: Record<string, {
-    home: number; away: number; status: string;
+    home?: number; away?: number; status: string;
     homePenalty?: number; awayPenalty?: number;
   }> = {};
 
@@ -233,9 +233,28 @@ export default async function handler(): Promise<Response> {
     if (m.status !== 'FINISHED' && m.status !== 'IN_PLAY' && m.status !== 'PAUSED') {
       continue;
     }
-    if (m.score.fullTime.home === null || m.score.fullTime.away === null) {
+
+    const isFinished = m.status === 'FINISHED';
+    const status     = isFinished ? 'completed' : 'live';
+
+    // Best available score: fullTime first, then halfTime (available from 45'+)
+    // Free tier has a ~10 min delay, so during early first half both may be null.
+    const ft   = m.score.fullTime;
+    const ht   = m.score.halfTime;
+    const home = ft.home !== null ? ft.home
+               : ht?.home !== null ? ht!.home!
+               : undefined;
+    const away = ft.away !== null ? ft.away
+               : ht?.away !== null ? ht!.away!
+               : undefined;
+
+    // Skip finished matches with no score (data issue — shouldn't happen)
+    if (isFinished && (home === undefined || away === undefined)) {
+      console.warn(`[fetch-scores] FINISHED with no score: ${m.homeTeam.tla} v ${m.awayTeam.tla}`);
       continue;
     }
+    // For live matches: always include even if score is not available yet,
+    // so the UI can show the "Live" indicator.
 
     // --- Find our internal match ID ---
     let ourId: number | undefined;
@@ -262,11 +281,11 @@ export default async function handler(): Promise<Response> {
       continue;
     }
 
-    const entry: typeof scores[string] = {
-      home:   m.score.fullTime.home,
-      away:   m.score.fullTime.away,
-      status: m.status === 'FINISHED' ? 'completed' : 'live',
-    };
+    const entry: typeof scores[string] = { status };
+    if (home !== undefined && away !== undefined) {
+      entry.home = home;
+      entry.away = away;
+    }
     if (m.score.penalties?.home != null && m.score.penalties.away != null) {
       entry.homePenalty = m.score.penalties.home;
       entry.awayPenalty = m.score.penalties.away;

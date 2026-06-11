@@ -115,6 +115,38 @@ export class FwcMatchCard extends LitElement {
       color: var(--fwc-gold-text);
     }
 
+    /* "Final" shown below the score for completed matches */
+    .status-final {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--fwc-text-subtle);
+      letter-spacing: 0.03em;
+    }
+
+    /* Pulsing dot + "Live" shown in the score area when match is in-progress
+       but we don't have a score number yet */
+    .live-no-score {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--fwc-danger);
+    }
+    .live-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--fwc-danger);
+      animation: dotPulse 1.2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.75); }
+    }
+
     .footer {
       margin-top: 8px;
       font-size: 0.7rem;
@@ -158,8 +190,9 @@ export class FwcMatchCard extends LitElement {
     const home = this._home;
     const away = this._away;
     const formatted = formatMatchTime(match.utc, timezone);
-    const hasScore = match.homeScore !== null && match.awayScore !== null;
-    const isLive = match.status === 'live';
+    const hasScore   = match.homeScore !== null && match.awayScore !== null;
+    const isLive     = match.status === 'live';
+    const isComplete = match.status === 'completed';
     const homeFav = home && favoriteTeamIds.includes(home.id);
     const awayFav = away && favoriteTeamIds.includes(away.id);
     const isFavoriteMatch = homeFav || awayFav;
@@ -211,18 +244,28 @@ export class FwcMatchCard extends LitElement {
                   <span class="score-sep" aria-hidden="true">–</span>
                   <span>${match.awayScore}</span>
                 </div>
+                ${isComplete
+                  ? html`<div class="status-final" aria-label="Full time">Final</div>`
+                  : nothing}
                 ${match.homePenalty !== undefined && match.homePenalty !== null
                   ? html`<div class="time-display" aria-label="Penalties: ${match.homePenalty}–${match.awayPenalty}">(${match.homePenalty}–${match.awayPenalty} pens)</div>`
                   : nothing}
               `
-              : html`
-                <div class="time-display ${this.isToday ? 'today' : ''}" aria-label="${formatted.time}">
-                  ${formatted.time}
-                </div>
-                <div class="score" aria-hidden="true">
-                  <span class="score-sep">vs</span>
-                </div>
-              `
+              : isLive
+                ? html`
+                  <div class="live-no-score" role="status" aria-label="${homeLabel} vs ${awayLabel}, match in progress">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    Live
+                  </div>
+                `
+                : html`
+                  <div class="time-display ${this.isToday ? 'today' : ''}" aria-label="${formatted.time}">
+                    ${formatted.time}
+                  </div>
+                  <div class="score" aria-hidden="true">
+                    <span class="score-sep">vs</span>
+                  </div>
+                `
             }
           </div>
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "Update this file (or the Gist it mirrors) to push results without a Netlify rebuild. Add only matches that have been played — omit scheduled matches. See src/lib/config.ts for the fetch URL.",
+  "_comment": "Starter payload — scores populated automatically by the Netlify cron function (fetch-scores.mts) every 5 minutes. No manual edits needed.",
   "updated": "2026-06-11T00:00:00Z",
   "scores": {}
 }
