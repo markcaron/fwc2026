@@ -28,8 +28,6 @@ export class FwcSettings extends LitElement {
     .section-title {
       font-size: 0.82rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
       color: var(--fwc-text-muted);
       padding: 0 4px 8px;
       border-bottom: 1px solid var(--fwc-border-subtle);
@@ -133,9 +131,14 @@ export class FwcSettings extends LitElement {
       justify-content: center;
       transition: border-color 0.12s, background 0.12s;
     }
+    /*
+     * Checked bg → gold so the --fwc-text-on-gold (navy-900) stroke is legible.
+     * gold #C9A227 + navy-900 #0a1b2e = 7.83:1 ✓
+     * Previous: navy-500 bg + navy-900 stroke ≈ 1.5:1 — failed.
+     */
     .team-toggle:has(input:checked) .toggle-check {
-      background: var(--fwc-highlight-ring);
-      border-color: var(--fwc-highlight-ring);
+      background: var(--fwc-gold);
+      border-color: var(--fwc-gold);
     }
     .check-mark {
       width: 8px;
@@ -150,8 +153,6 @@ export class FwcSettings extends LitElement {
       font-size: 0.7rem;
       font-weight: 700;
       color: var(--fwc-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
       margin: 10px 0 5px;
       padding: 0 2px;
     }

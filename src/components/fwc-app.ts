@@ -1,8 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { loadPreferences, updatePreferences } from '../lib/storage.js';
-import { getTodayString, formatMatchTime } from '../lib/time.js';
-import { MATCHES } from '../lib/data.js';
+import { formatMatchTime } from '../lib/time.js';
 import type { StoredPreferences, TabId } from '../lib/types.js';
 import type { PreferencesChangedEvent } from './fwc-settings.js';
 import './fwc-schedule.js';
@@ -13,162 +12,183 @@ import './fwc-settings.js';
 @customElement('fwc-app')
 export class FwcApp extends LitElement {
   static styles = css`
+    /* Normal page flow — no fixed, no sticky, no overflow:hidden */
     :host {
       display: flex;
       flex-direction: column;
       min-height: 100dvh;
     }
 
-    /* ── Header ─────────────────────────────────────── */
+    /*
+     * Skip link — fixed so it overlays content without affecting layout.
+     * Normally parked off-screen (top: -60px). On focus it slides into view
+     * at top: 12px, centered, pill-shaped to match button style.
+     * position:fixed is explicitly allowed here per product decision.
+     */
+    .skip-link {
+      position: fixed;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      padding: 8px 20px;
+      background: var(--fwc-gold);
+      color: var(--fwc-text-on-gold);
+      font-weight: 600;
+      font-size: 0.85rem;
+      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+      border-radius: 20px;
+      box-shadow: var(--fwc-shadow-md);
+      transition: top 0.15s;
+    }
+    .skip-link:focus {
+      top: 12px;
+    }
+    .skip-link:focus-visible {
+      outline: 2px solid var(--fwc-gold-600);
+      outline-offset: 2px;
+    }
+
+    /* ── Floating header ─────────────────────────────────────── */
+    /*
+     * margin: 4px gives the "floating card" look without any
+     * position:fixed/sticky. Everything scrolls naturally.
+     * border-radius + shadow finish the floating aesthetic.
+     */
     .app-header {
-      background: var(--fwc-header-bg);
-      color: #fff;
-      padding: 12px 16px 10px;
-      padding-top: calc(12px + env(safe-area-inset-top));
-      box-shadow: var(--fwc-shadow-header);
-      flex-shrink: 0;
+      margin: 4px 4px 0;
+      background: linear-gradient(135deg, #163660 0%, #1f5e94 100%);
+      color: #ffffff;
+      padding: 20px 24px;
+      padding-top: calc(20px + env(safe-area-inset-top));
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
     }
     .header-inner {
       display: flex;
       align-items: center;
-      gap: 10px;
-      max-width: 900px;
-      margin: 0 auto;
+      gap: 12px;
     }
-    .header-trophy {
-      font-size: 1.6rem;
-      line-height: 1;
+    /*
+     * Trophy icon via CSS mask — shape from world-cup.svg,
+     * gold-400 (#e0b83a) gives a rich trophy-gold on the dark header.
+     */
+    .header-icon {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      background-color: var(--fwc-gold-400);
+      -webkit-mask: url('/public/world-cup.svg') no-repeat center / contain;
+      mask: url('/public/world-cup.svg') no-repeat center / contain;
       flex-shrink: 0;
     }
     .header-text { flex: 1; min-width: 0; }
     .header-title {
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: 800;
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-300);
       letter-spacing: 0.01em;
       line-height: 1.2;
     }
     .header-sub {
-      font-size: 0.72rem;
-      color: rgba(255,255,255,0.7);
-      margin-top: 1px;
-    }
-    .header-today {
-      text-align: right;
-      flex-shrink: 0;
-    }
-    .today-badge {
-      display: inline-block;
-      background: rgba(201,162,39,0.2);
-      border: 1px solid var(--fwc-gold);
-      border-radius: 6px;
-      padding: 2px 8px;
       font-size: 0.7rem;
-      font-weight: 700;
-      color: var(--fwc-gold);
-    }
-    .today-match-count {
-      font-size: 0.68rem;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.65);
       margin-top: 2px;
-      text-align: right;
     }
-
-    /* ── Content area ───────────────────────────────── */
-    .app-content {
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior-y: contain;
-      background: var(--fwc-bg-body);
-    }
-    .tab-panel {
-      display: none;
-      min-height: 100%;
-    }
-    .tab-panel[data-active] {
-      display: block;
-    }
-
-    /* ── Bottom tab bar ─────────────────────────────── */
-    .tab-bar {
+    .date-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      background: var(--fwc-gold);
+      color: var(--fwc-text-on-gold);
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
       flex-shrink: 0;
-      background: var(--fwc-tab-bg);
-      border-top: 1px solid var(--fwc-border);
-      box-shadow: var(--fwc-shadow-tab);
-      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── Tab nav — coach-board underline style ───────────────── */
+    /*
+     * Moved from the bottom to just below the floating header.
+     * Underline indicator, icon above label, full-width flex tabs.
+     * Mirrors the .help-tabs-wrap pattern from coach-board.
+     */
+    .tab-bar {
+      border-bottom: 1px solid var(--fwc-border);
+      padding: 0 4px;
+      margin-top: 8px;
     }
     .tab-list {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      max-width: 600px;
-      margin: 0 auto;
+      display: flex;
+      gap: 2px;
+      padding: 8px 0 0;
+      margin: 0;
     }
     .tab-btn {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 2px;
-      min-height: 56px;
-      padding: 6px 4px;
-      background: none;
+      gap: 4px;
+      padding: 8px 4px 10px;
+      background: transparent;
       border: none;
-      cursor: pointer;
+      border-bottom: 2px solid transparent;
       color: var(--fwc-tab-text);
-      transition: color 0.15s;
-      font-family: inherit;
-      position: relative;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover:not([aria-selected="true"]) {
+      color: var(--fwc-text);
+      background: color-mix(in srgb, var(--fwc-accent) 6%, transparent);
+      border-radius: 6px 6px 0 0;
     }
     .tab-btn[aria-selected="true"] {
       color: var(--fwc-tab-active);
-    }
-    .tab-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 20%;
-      right: 20%;
-      height: 2px;
-      background: var(--fwc-tab-active);
-      border-radius: 0 0 2px 2px;
-      transform: scaleX(0);
-      transition: transform 0.15s;
-    }
-    .tab-btn[aria-selected="true"]::before {
-      transform: scaleX(1);
+      border-bottom-color: var(--fwc-tab-active);
+      font-weight: 700;
     }
     .tab-btn:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: -2px;
+      border-radius: 6px 6px 0 0;
     }
 
-    .tab-icon { font-size: 1.3rem; line-height: 1; }
-    .tab-label {
-      font-size: 0.64rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
+    /* Tab icons via CSS mask — inherit color from parent .tab-btn */
+    .tab-icon {
+      display: block;
+      width: 28px;
+      height: 28px;
+      background-color: currentColor;
+      flex-shrink: 0;
     }
+    .tab-icon-schedule  { -webkit-mask: url('/public/icon-schedule.svg')  no-repeat center / contain; mask: url('/public/icon-schedule.svg')  no-repeat center / contain; }
+    .tab-icon-groups    { -webkit-mask: url('/public/icon-groups.svg')    no-repeat center / contain; mask: url('/public/icon-groups.svg')    no-repeat center / contain; }
+    .tab-icon-knockouts { -webkit-mask: url('/public/icon-knockouts.svg') no-repeat center / contain; mask: url('/public/icon-knockouts.svg') no-repeat center / contain; }
+    .tab-icon-settings  { -webkit-mask: url('/public/icon-settings.svg')  no-repeat center / contain; mask: url('/public/icon-settings.svg')  no-repeat center / contain; }
 
-    /* Today badge on Schedule tab */
-    .tab-pip {
-      position: absolute;
-      top: 8px;
-      right: calc(50% - 12px);
-      width: 7px;
-      height: 7px;
-      background: var(--fwc-danger);
-      border-radius: 50%;
-      border: 1.5px solid var(--fwc-tab-bg);
+    /* ── Content area ────────────────────────────────────────── */
+    .app-content {
+      flex: 1;
+      background: var(--fwc-bg-body);
+    }
+    .tab-panel { display: none; }
+    .tab-panel[data-active] {
+      display: block;
+      padding-block: 16px 32px;
     }
 
     .visually-hidden {
       position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
       overflow: hidden;
       clip: rect(0,0,0,0);
       white-space: nowrap;
@@ -179,20 +199,8 @@ export class FwcApp extends LitElement {
   @state() private _prefs: StoredPreferences = loadPreferences();
   @state() private _activeTab: TabId = 'schedule';
 
-  private get _todayMatchCount(): number {
-    const today = getTodayString(this._prefs.timezone);
-    return MATCHES.filter(m => {
-      const d = new Intl.DateTimeFormat('en-CA', {
-        timeZone: this._prefs.timezone,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-      }).format(new Date(m.utc));
-      return d === today;
-    }).length;
-  }
-
   private get _todayLabel(): string {
-    const fmt = formatMatchTime(new Date().toISOString(), this._prefs.timezone);
-    return fmt.dateShort;
+    return formatMatchTime(new Date().toISOString(), this._prefs.timezone).dateShort;
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -200,9 +208,7 @@ export class FwcApp extends LitElement {
     this._prefs = updatePreferences(ev.prefs);
   }
 
-  private _selectTab(tab: TabId) {
-    this._activeTab = tab;
-  }
+  private _selectTab(tab: TabId) { this._activeTab = tab; }
 
   private _onTabKeydown(e: KeyboardEvent, current: TabId) {
     const tabs: TabId[] = ['schedule', 'groups', 'bracket', 'settings'];
@@ -215,156 +221,118 @@ export class FwcApp extends LitElement {
     else return;
     e.preventDefault();
     this._activeTab = tabs[next];
-    // Move focus to the newly selected tab button
     this.shadowRoot?.querySelector<HTMLButtonElement>(`#tab-${tabs[next]}`)?.focus();
   }
 
   render() {
     const { _prefs: prefs, _activeTab: active } = this;
-    const todayCount = this._todayMatchCount;
 
     return html`
-      <!-- Skip-to-content link for keyboard/screen reader users -->
-      <a href="#main-content" class="visually-hidden" tabindex="0"
-         style="position:fixed;top:4px;left:4px;z-index:9999;background:var(--fwc-gold);color:var(--fwc-text-on-gold);padding:6px 12px;border-radius:4px;">
-        Skip to content
-      </a>
+      <a href="#main-content" class="skip-link">Skip to content</a>
 
       <header class="app-header" role="banner">
         <div class="header-inner">
-          <div class="header-trophy" role="img" aria-label="Trophy">🏆</div>
+          <div class="header-icon" role="img" aria-label="World Cup trophy"></div>
           <div class="header-text">
             <div class="header-title">FIFA World Cup 2026™</div>
             <div class="header-sub">USA · Canada · Mexico · Jun 11 – Jul 19</div>
           </div>
-          <div class="header-today" aria-label="${todayCount} matches today, ${this._todayLabel}">
-            <div class="today-badge">${this._todayLabel}</div>
-            ${todayCount > 0
-              ? html`<div class="today-match-count">${todayCount} match${todayCount !== 1 ? 'es' : ''} today</div>`
-              : html``
-            }
-          </div>
+          <span class="date-pill" aria-label="Today, ${this._todayLabel}">
+            ${this._todayLabel}
+          </span>
         </div>
       </header>
 
-      <main class="app-content" id="main-content">
-        <div
-          class="tab-panel"
-          id="panel-schedule"
-          role="tabpanel"
-          aria-labelledby="tab-schedule"
-          ?data-active="${active === 'schedule'}"
-          tabindex="0"
-        >
-          <fwc-schedule
-            .timezone="${prefs.timezone}"
-            .favoriteTeamIds="${prefs.favoriteTeamIds}"
-          ></fwc-schedule>
-        </div>
-
-        <div
-          class="tab-panel"
-          id="panel-groups"
-          role="tabpanel"
-          aria-labelledby="tab-groups"
-          ?data-active="${active === 'groups'}"
-          tabindex="0"
-        >
-          <fwc-standings
-            .favoriteTeamIds="${prefs.favoriteTeamIds}"
-          ></fwc-standings>
-        </div>
-
-        <div
-          class="tab-panel"
-          id="panel-bracket"
-          role="tabpanel"
-          aria-labelledby="tab-bracket"
-          ?data-active="${active === 'bracket'}"
-          tabindex="0"
-        >
-          <fwc-bracket
-            .timezone="${prefs.timezone}"
-            .favoriteTeamIds="${prefs.favoriteTeamIds}"
-          ></fwc-bracket>
-        </div>
-
-        <div
-          class="tab-panel"
-          id="panel-settings"
-          role="tabpanel"
-          aria-labelledby="tab-settings"
-          ?data-active="${active === 'settings'}"
-          tabindex="0"
-          @preferences-changed="${this._handlePrefsChanged}"
-        >
-          <fwc-settings
-            .timezone="${prefs.timezone}"
-            .favoriteTeamIds="${prefs.favoriteTeamIds}"
-          ></fwc-settings>
-        </div>
-      </main>
-
+      <!-- Tab bar below the floating header -->
       <nav class="tab-bar" role="navigation" aria-label="Main navigation">
         <div class="tab-list" role="tablist">
           <button
-            class="tab-btn"
-            id="tab-schedule"
-            role="tab"
+            class="tab-btn" id="tab-schedule" role="tab"
             aria-selected="${active === 'schedule'}"
             aria-controls="panel-schedule"
             tabindex="${active === 'schedule' ? '0' : '-1'}"
             @click="${() => this._selectTab('schedule')}"
             @keydown="${(e: KeyboardEvent) => this._onTabKeydown(e, 'schedule')}"
           >
-            ${todayCount > 0 ? html`<span class="tab-pip" aria-hidden="true"></span>` : html``}
-            <span class="tab-icon" aria-hidden="true">📅</span>
-            <span class="tab-label">Schedule</span>
+            <span class="tab-icon tab-icon-schedule" aria-hidden="true"></span>
+            <span>Schedule</span>
           </button>
 
           <button
-            class="tab-btn"
-            id="tab-groups"
-            role="tab"
+            class="tab-btn" id="tab-groups" role="tab"
             aria-selected="${active === 'groups'}"
             aria-controls="panel-groups"
             tabindex="${active === 'groups' ? '0' : '-1'}"
             @click="${() => this._selectTab('groups')}"
             @keydown="${(e: KeyboardEvent) => this._onTabKeydown(e, 'groups')}"
           >
-            <span class="tab-icon" aria-hidden="true">📊</span>
-            <span class="tab-label">Groups</span>
+            <span class="tab-icon tab-icon-groups" aria-hidden="true"></span>
+            <span>Groups</span>
           </button>
 
           <button
-            class="tab-btn"
-            id="tab-bracket"
-            role="tab"
+            class="tab-btn" id="tab-bracket" role="tab"
             aria-selected="${active === 'bracket'}"
             aria-controls="panel-bracket"
             tabindex="${active === 'bracket' ? '0' : '-1'}"
             @click="${() => this._selectTab('bracket')}"
             @keydown="${(e: KeyboardEvent) => this._onTabKeydown(e, 'bracket')}"
           >
-            <span class="tab-icon" aria-hidden="true">🥊</span>
-            <span class="tab-label">Bracket</span>
+            <span class="tab-icon tab-icon-knockouts" aria-hidden="true"></span>
+            <span>Knockouts</span>
           </button>
 
           <button
-            class="tab-btn"
-            id="tab-settings"
-            role="tab"
+            class="tab-btn" id="tab-settings" role="tab"
             aria-selected="${active === 'settings'}"
             aria-controls="panel-settings"
             tabindex="${active === 'settings' ? '0' : '-1'}"
             @click="${() => this._selectTab('settings')}"
             @keydown="${(e: KeyboardEvent) => this._onTabKeydown(e, 'settings')}"
           >
-            <span class="tab-icon" aria-hidden="true">⚙️</span>
-            <span class="tab-label">Settings</span>
+            <span class="tab-icon tab-icon-settings" aria-hidden="true"></span>
+            <span>Settings</span>
           </button>
         </div>
       </nav>
+
+      <main class="app-content" id="main-content">
+        <div class="tab-panel" id="panel-schedule" role="tabpanel"
+             aria-labelledby="tab-schedule"
+             ?data-active="${active === 'schedule'}" tabindex="0">
+          <fwc-schedule
+            .timezone="${prefs.timezone}"
+            .favoriteTeamIds="${prefs.favoriteTeamIds}"
+          ></fwc-schedule>
+        </div>
+
+        <div class="tab-panel" id="panel-groups" role="tabpanel"
+             aria-labelledby="tab-groups"
+             ?data-active="${active === 'groups'}" tabindex="0">
+          <fwc-standings
+            .favoriteTeamIds="${prefs.favoriteTeamIds}"
+          ></fwc-standings>
+        </div>
+
+        <div class="tab-panel" id="panel-bracket" role="tabpanel"
+             aria-labelledby="tab-bracket"
+             ?data-active="${active === 'bracket'}" tabindex="0">
+          <fwc-bracket
+            .timezone="${prefs.timezone}"
+            .favoriteTeamIds="${prefs.favoriteTeamIds}"
+          ></fwc-bracket>
+        </div>
+
+        <div class="tab-panel" id="panel-settings" role="tabpanel"
+             aria-labelledby="tab-settings"
+             ?data-active="${active === 'settings'}" tabindex="0"
+             @preferences-changed="${this._handlePrefsChanged}">
+          <fwc-settings
+            .timezone="${prefs.timezone}"
+            .favoriteTeamIds="${prefs.favoriteTeamIds}"
+          ></fwc-settings>
+        </div>
+      </main>
     `;
   }
 }

@@ -14,7 +14,7 @@ export class FwcMatchCard extends LitElement {
       background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: var(--fwc-radius-md);
-      padding: 12px 14px;
+      padding: 16px 20px;
       box-shadow: var(--fwc-shadow-sm);
       transition: border-color 0.15s, box-shadow 0.15s;
     }
@@ -47,8 +47,6 @@ export class FwcMatchCard extends LitElement {
       padding: 1px 6px;
       font-size: 0.68rem;
       font-weight: 600;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
     }
     .badge.live {
       background: var(--fwc-danger);

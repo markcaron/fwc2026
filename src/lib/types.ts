@@ -70,7 +70,7 @@ export const ROUND_LABELS: Record<MatchRound, string> = {
   final: 'Final',
 };
 
-export type FilterType = 'all' | 'today' | 'group' | 'team' | 'round';
+export type FilterType = 'all' | 'today' | 'date' | 'favorites' | 'group' | 'team' | 'round';
 
 export interface ScheduleFilter {
   type: FilterType;

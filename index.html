@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Interactive FIFA World Cup 2026 schedule — match times in your timezone, live scores, group standings, and knockout bracket." />
     <meta name="theme-color" content="#0a1b2e" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#1a5fa8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#163660" media="(prefers-color-scheme: light)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>WC 2026 — Schedule &amp; Standings</title>
@@ -21,6 +21,15 @@
         color: var(--fwc-text);
         min-height: 100dvh;
         overscroll-behavior: none;
+        /* Center the app on wide screens */
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      fwc-app {
+        width: 100%;
+        max-width: 900px;
+        /* No side borders — open, clean feel */
       }
     </style>
   </head>

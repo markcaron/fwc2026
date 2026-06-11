@@ -30,8 +30,6 @@ export class FwcBracket extends LitElement {
       font-size: 0.82rem;
       font-weight: 700;
       color: var(--fwc-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -145,8 +143,6 @@ export class FwcBracket extends LitElement {
       font-size: 0.8rem;
       font-weight: 700;
       color: var(--fwc-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
     }
     .trophy-team {
       font-size: 1rem;

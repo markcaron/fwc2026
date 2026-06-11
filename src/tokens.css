@@ -104,11 +104,13 @@
   --fwc-qualified-bg: light-dark(#dcfce7, rgba(74,222,128,0.12));
   --fwc-playoff-bg:  light-dark(#fef9c3, rgba(252,211,77,0.12));
 
-  /* --- Header / toolbar gradient --- */
-  --fwc-header-bg:   light-dark(
-    linear-gradient(135deg, var(--fwc-navy-700) 0%, var(--fwc-navy-500) 100%),
-    linear-gradient(135deg, var(--fwc-navy-900) 0%, var(--fwc-navy-800) 100%)
-  );
+  /*
+   * --fwc-header-bg intentionally removed.
+   * light-dark() accepts <color> values only — passing linear-gradient() (an
+   * <image>) is invalid CSS and browsers silently discard it, leaving the
+   * header transparent over the light body background.
+   * The gradient is now hardcoded directly in fwc-app.ts where it is used.
+   */
 
   /* --- Tab bar --- */
   --fwc-tab-bg:      light-dark(var(--fwc-white),     var(--fwc-navy-900));

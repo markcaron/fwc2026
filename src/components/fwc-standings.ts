@@ -36,7 +36,6 @@ export class FwcStandings extends LitElement {
       padding: 8px 12px;
       font-size: 0.82rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
       color: var(--fwc-text);
       border-bottom: 1px solid var(--fwc-border);
       display: flex;
@@ -68,8 +67,6 @@ export class FwcStandings extends LitElement {
       color: var(--fwc-text-subtle);
       font-weight: 600;
       font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
       border-bottom: 1px solid var(--fwc-border-subtle);
     }
     thead th.team-col { text-align: left; padding-left: 8px; }
