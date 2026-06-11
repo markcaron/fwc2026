@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0a1b2e"/>
+  <circle cx="32" cy="30" r="18" fill="none" stroke="#C9A227" stroke-width="3"/>
+  <circle cx="32" cy="30" r="7" fill="#C9A227"/>
+  <path d="M32 12 L32 18 M32 42 L32 48 M14 30 L20 30 M44 30 L50 30 M18.7 16.7 L23 21 M41 39 L45.3 43.3 M45.3 16.7 L41 21 M23 39 L18.7 43.3" stroke="#C9A227" stroke-width="2" stroke-linecap="round"/>
+  <text x="32" y="58" text-anchor="middle" fill="#C9A227" font-family="system-ui" font-size="8" font-weight="bold">2026</text>
+</svg>

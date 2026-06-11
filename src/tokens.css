@@ -1,0 +1,112 @@
+/* ============================================================
+   FIFA World Cup 2026 — Design Tokens
+   Three-tier: Primitive → Semantic → Component
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+
+  /* --- PRIMITIVES: static hex values --- */
+
+  /* Navy scale */
+  --fwc-navy-950: #040d18;
+  --fwc-navy-900: #0a1b2e;
+  --fwc-navy-800: #0f2744;
+  --fwc-navy-700: #163660;
+  --fwc-navy-600: #1a4a7a;
+  --fwc-navy-500: #1f5e94;
+  --fwc-navy-400: #2a7abf;
+
+  /* Gold / Trophy */
+  --fwc-gold-600: #a07c10;
+  --fwc-gold-500: #C9A227;
+  --fwc-gold-400: #e0b83a;
+  --fwc-gold-300: #f0cc6a;
+  --fwc-gold-200: #fae8b0;
+
+  /* Red / FIFA */
+  --fwc-red-700: #a01f16;
+  --fwc-red-600: #c42519;
+  --fwc-red-500: #DA291C;
+  --fwc-red-400: #e85547;
+  --fwc-red-300: #f87171;
+
+  /* Neutral */
+  --fwc-white:    #ffffff;
+  --fwc-gray-100: #f0f4f8;
+  --fwc-gray-200: #dde4ed;
+  --fwc-gray-300: #b8c5d4;
+  --fwc-gray-400: #8fa4bc;
+  --fwc-gray-500: #6684a0;
+  --fwc-gray-600: #4a6380;
+  --fwc-gray-700: #2e4060;
+  --fwc-gray-800: #1c2d44;
+  --fwc-gray-900: #0e1a2a;
+
+  /* Green (qualified/success) */
+  --fwc-green-600: #166534;
+  --fwc-green-500: #16a34a;
+  --fwc-green-400: #4ade80;
+  --fwc-green-300: #86efac;
+
+  /* Amber (warning/playoff) */
+  --fwc-amber-500: #d97706;
+  --fwc-amber-400: #f59e0b;
+  --fwc-amber-300: #fcd34d;
+
+  /* --- SEMANTIC TOKENS (light-dark pairs) --- */
+
+  --fwc-bg-body:     light-dark(var(--fwc-gray-100),  var(--fwc-navy-950));
+  --fwc-bg-primary:  light-dark(var(--fwc-white),     var(--fwc-navy-900));
+  --fwc-bg-surface:  light-dark(var(--fwc-gray-200),  var(--fwc-navy-800));
+  --fwc-bg-raised:   light-dark(var(--fwc-white),     var(--fwc-navy-700));
+  --fwc-bg-overlay:  light-dark(rgba(0,0,0,0.05),     rgba(0,0,0,0.4));
+
+  --fwc-text:        light-dark(var(--fwc-navy-900),  #e0e8f0);
+  --fwc-text-muted:  light-dark(var(--fwc-gray-600),  var(--fwc-gray-400));
+  --fwc-text-subtle: light-dark(var(--fwc-gray-500),  var(--fwc-gray-500));
+  --fwc-text-on-gold: var(--fwc-navy-900);
+  --fwc-text-on-red: var(--fwc-white);
+
+  --fwc-border:      light-dark(var(--fwc-gray-300),  var(--fwc-navy-600));
+  --fwc-border-subtle: light-dark(var(--fwc-gray-200), rgba(255,255,255,0.08));
+
+  --fwc-accent:      light-dark(var(--fwc-navy-500),  var(--fwc-navy-400));
+  --fwc-accent-hover: light-dark(var(--fwc-navy-600), var(--fwc-navy-300, #3d8fd4));
+  --fwc-gold:        var(--fwc-gold-500);
+  --fwc-gold-hover:  var(--fwc-gold-400);
+  --fwc-danger:      var(--fwc-red-500);
+  --fwc-danger-text: light-dark(var(--fwc-red-600),   var(--fwc-red-300));
+
+  --fwc-qualified:   light-dark(var(--fwc-green-600), var(--fwc-green-400));
+  --fwc-playoff:     light-dark(var(--fwc-amber-500), var(--fwc-amber-300));
+  --fwc-qualified-bg: light-dark(#dcfce7, rgba(74,222,128,0.12));
+  --fwc-playoff-bg:  light-dark(#fef9c3, rgba(252,211,77,0.12));
+
+  /* --- Header / toolbar gradient --- */
+  --fwc-header-bg:   light-dark(
+    linear-gradient(135deg, var(--fwc-navy-700) 0%, var(--fwc-navy-500) 100%),
+    linear-gradient(135deg, var(--fwc-navy-900) 0%, var(--fwc-navy-800) 100%)
+  );
+
+  /* --- Tab bar --- */
+  --fwc-tab-bg:      light-dark(var(--fwc-white),     var(--fwc-navy-900));
+  --fwc-tab-active:  var(--fwc-gold-500);
+  --fwc-tab-text:    light-dark(var(--fwc-gray-600),  var(--fwc-gray-400));
+
+  /* --- Shadows --- */
+  --fwc-shadow-sm:   0 1px 3px rgba(0,0,0,0.2);
+  --fwc-shadow-md:   0 4px 16px rgba(0,0,0,0.3);
+  --fwc-shadow-lg:   0 8px 32px rgba(0,0,0,0.5);
+  --fwc-shadow-header: 0 2px 8px rgba(0,0,0,0.4);
+  --fwc-shadow-tab:  0 -2px 8px rgba(0,0,0,0.15);
+
+  /* --- Radius --- */
+  --fwc-radius-sm:   6px;
+  --fwc-radius-md:   10px;
+  --fwc-radius-lg:   16px;
+
+  /* --- Focus ring --- */
+  --fwc-focus-ring:  2px solid var(--fwc-gold-400);
+  --fwc-focus-offset: 2px;
+}
