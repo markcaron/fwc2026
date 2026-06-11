@@ -1,48 +1,87 @@
 /**
  * Netlify Scheduled Function — runs every 5 minutes.
  *
- * Fetches live / completed match scores from football-data.org and writes
- * the result to Netlify Blobs. The frontend reads from /api/scores (see
- * scores.mts), so no rebuild is ever needed to update results.
+ * Fetches live / completed match scores from ESPN's unofficial public
+ * scoreboard API (no authentication required) and writes the result to
+ * Netlify Blobs. The frontend reads from /api/scores (see scores.mts).
  *
- * Required environment variable (set in Netlify dashboard):
- *   FOOTBALL_DATA_API_KEY  — free tier at https://www.football-data.org/client/register
+ * Why ESPN instead of football-data.org:
+ *   football-data.org free tier shows WC 2026 matches as "TIMED" even during
+ *   play — live data is paywalled. ESPN's public scoreboard API has no
+ *   authentication requirement and updates in real time.
  *
- * football-data.org competition code for FIFA World Cup: "WC"
- * (verify at https://api.football-data.org/v4/competitions if not working)
+ * No environment variables required — just deploy and it works.
  */
 
 import type { Config } from '@netlify/functions';
 import { getStore } from '@netlify/blobs';
 
-// ── Team TLA → internal ID ────────────────────────────────────────────────────
-// Maps football-data.org 3-letter codes to our internal team IDs.
-// Add aliases for codes that might differ between data sources.
-const TEAM_BY_TLA: Record<string, string> = {
-  MEX: 'mex', RSA: 'zaf', KOR: 'kor', CZE: 'cze',
-  CAN: 'can', SUI: 'sui', QAT: 'qat', BIH: 'bih',
-  BRA: 'bra', MAR: 'mar', SCO: 'sco', HAI: 'hai', HTI: 'hai',
-  USA: 'usa', PAR: 'par', AUS: 'aus', TUR: 'tur',
-  GER: 'ger', CUW: 'cur', CIV: 'civ',  ECU: 'ecu',
-  NED: 'ned', JPN: 'jpn', TUN: 'tun',  SWE: 'swe',
-  BEL: 'bel', EGY: 'egy', IRN: 'irn',  IRI: 'irn', // Iran has two common codes
-  NZL: 'nzl', NZE: 'nzl',
-  ESP: 'esp', CPV: 'cpv', CVE: 'cpv',  KSA: 'ksa', SAU: 'ksa',
-  URU: 'uru', FRA: 'fra', SEN: 'sen',  NOR: 'nor', IRQ: 'irq',
-  ARG: 'arg', ALG: 'alg', DZA: 'alg', AUT: 'aut', JOR: 'jor',
-  POR: 'por', UZB: 'uzb', COL: 'col',  COD: 'cod', DRC: 'cod',
-  ENG: 'eng', CRO: 'cro', GHA: 'gha', PAN: 'pan',
+const ESPN_URL =
+  'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+
+// ── Team abbreviation → internal ID ──────────────────────────────────────────
+// ESPN uses standard FIFA abbreviations for most teams; aliases cover
+// known variations.
+const TEAM_BY_ABB: Record<string, string> = {
+  MEX: 'mex',
+  RSA: 'zaf', ZAF: 'zaf',
+  KOR: 'kor',
+  CZE: 'cze',
+  CAN: 'can',
+  SUI: 'sui',
+  QAT: 'qat',
+  BIH: 'bih',
+  BRA: 'bra',
+  MAR: 'mar',
+  SCO: 'sco',
+  HAI: 'hai', HTI: 'hai',
+  USA: 'usa',
+  PAR: 'par',
+  AUS: 'aus',
+  TUR: 'tur',
+  GER: 'ger',
+  CUW: 'cur', CUR: 'cur',
+  CIV: 'civ', CDI: 'civ',
+  ECU: 'ecu',
+  NED: 'ned',
+  JPN: 'jpn',
+  TUN: 'tun',
+  SWE: 'swe',
+  BEL: 'bel',
+  EGY: 'egy',
+  IRN: 'irn', IRI: 'irn',
+  NZL: 'nzl',
+  ESP: 'esp',
+  CPV: 'cpv', CVE: 'cpv',
+  KSA: 'ksa', SAU: 'ksa',
+  URU: 'uru',
+  FRA: 'fra',
+  SEN: 'sen',
+  NOR: 'nor',
+  IRQ: 'irq',
+  ARG: 'arg',
+  ALG: 'alg', DZA: 'alg',
+  AUT: 'aut',
+  JOR: 'jor',
+  POR: 'por',
+  UZB: 'uzb',
+  COL: 'col',
+  COD: 'cod', DRC: 'cod', CGO: 'cod',
+  ENG: 'eng',
+  CRO: 'cro',
+  GHA: 'gha',
+  PAN: 'pan',
 };
 
 // ── Fixture table: all 104 matches ───────────────────────────────────────────
 // Group stage: homeId + awayId are our internal team IDs.
-// Knockout stage: homeId/awayId are null until teams qualify;
-//   these are matched by UTC time instead.
+// Knockout stage: homeId/awayId are null until teams qualify — matched by UTC
+// time instead.
 interface Fixture {
-  id: number;
-  home: string | null;  // internal team ID
+  id:   number;
+  home: string | null;
   away: string | null;
-  utc: string;          // ISO 8601 UTC
+  utc:  string;
 }
 
 const FIXTURES: Fixture[] = [
@@ -130,7 +169,7 @@ const FIXTURES: Fixture[] = [
   { id: 46, home:'pan', away:'cro', utc:'2026-06-23T23:00:00Z' },
   { id: 67, home:'pan', away:'eng', utc:'2026-06-27T21:00:00Z' },
   { id: 68, home:'cro', away:'gha', utc:'2026-06-27T21:00:00Z' },
-  // ── Round of 32 (knockout — teams TBD, matched by UTC time) ──
+  // ── Knockout (teams TBD — matched by UTC time) ────────────────
   { id: 73, home:null, away:null, utc:'2026-06-28T19:00:00Z' },
   { id: 74, home:null, away:null, utc:'2026-06-29T20:30:00Z' },
   { id: 75, home:null, away:null, utc:'2026-06-30T01:00:00Z' },
@@ -147,7 +186,6 @@ const FIXTURES: Fixture[] = [
   { id: 86, home:null, away:null, utc:'2026-07-03T22:00:00Z' },
   { id: 87, home:null, away:null, utc:'2026-07-04T01:30:00Z' },
   { id: 88, home:null, away:null, utc:'2026-07-03T18:00:00Z' },
-  // ── Round of 16 ──────────────────────────────────────────────
   { id: 89, home:null, away:null, utc:'2026-07-04T21:00:00Z' },
   { id: 90, home:null, away:null, utc:'2026-07-04T17:00:00Z' },
   { id: 91, home:null, away:null, utc:'2026-07-05T20:00:00Z' },
@@ -156,156 +194,122 @@ const FIXTURES: Fixture[] = [
   { id: 94, home:null, away:null, utc:'2026-07-07T00:00:00Z' },
   { id: 95, home:null, away:null, utc:'2026-07-07T16:00:00Z' },
   { id: 96, home:null, away:null, utc:'2026-07-07T20:00:00Z' },
-  // ── Quarterfinals ────────────────────────────────────────────
   { id: 97, home:null, away:null, utc:'2026-07-09T20:00:00Z' },
   { id: 98, home:null, away:null, utc:'2026-07-10T19:00:00Z' },
   { id: 99, home:null, away:null, utc:'2026-07-11T21:00:00Z' },
   { id:100, home:null, away:null, utc:'2026-07-12T01:00:00Z' },
-  // ── Semifinals ───────────────────────────────────────────────
   { id:101, home:null, away:null, utc:'2026-07-14T19:00:00Z' },
   { id:102, home:null, away:null, utc:'2026-07-15T19:00:00Z' },
-  // ── Third-place ───────────────────────────────────────────────
   { id:103, home:null, away:null, utc:'2026-07-18T21:00:00Z' },
-  // ── Final ─────────────────────────────────────────────────────
   { id:104, home:null, away:null, utc:'2026-07-19T19:00:00Z' },
 ];
 
 // ── Lookup tables ─────────────────────────────────────────────────────────────
-// Primary: home:away internal IDs → our match ID (group stage)
 const BY_TEAMS = new Map<string, number>();
-// Fallback: UTC epoch rounded to nearest minute → our match ID (knockout)
 const BY_TIME  = new Map<number, number>();
 
 for (const f of FIXTURES) {
-  if (f.home && f.away) {
-    BY_TEAMS.set(`${f.home}:${f.away}`, f.id);
-  }
-  // Round to nearest minute for time-based lookup
+  if (f.home && f.away) BY_TEAMS.set(`${f.home}:${f.away}`, f.id);
   BY_TIME.set(Math.round(new Date(f.utc).getTime() / 60000), f.id);
 }
 
-// ── football-data.org types ───────────────────────────────────────────────────
-interface FDScore {
-  fullTime: { home: number | null; away: number | null };
-  penalties?: { home: number | null; away: number | null };
+// ── ESPN types ────────────────────────────────────────────────────────────────
+interface ESPNCompetitor {
+  homeAway: 'home' | 'away';
+  score:    string;
+  team: { abbreviation: string };
 }
-interface FDMatch {
-  status: string;  // SCHEDULED | IN_PLAY | PAUSED | FINISHED | ...
-  utcDate: string;
-  homeTeam: { tla: string };
-  awayTeam: { tla: string };
-  score: FDScore;
+interface ESPNStatusType {
+  name:      string;   // STATUS_FINAL | STATUS_IN_PROGRESS | STATUS_HALFTIME | STATUS_SCHEDULED | …
+  state:     string;   // 'pre' | 'in' | 'post'
+  completed: boolean;
+}
+interface ESPNEvent {
+  date: string;
+  competitions: [{
+    status:      { type: ESPNStatusType };
+    competitors: ESPNCompetitor[];
+  }];
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(): Promise<Response> {
-  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
-  if (!apiKey) {
-    console.error('[fetch-scores] FOOTBALL_DATA_API_KEY is not set');
-    return new Response('missing API key', { status: 500 });
-  }
-
-  let matches: FDMatch[];
+  let events: ESPNEvent[];
   try {
-    const res = await fetch(
-      'https://api.football-data.org/v4/competitions/WC/matches',
-      { headers: { 'X-Auth-Token': apiKey } },
-    );
+    const res = await fetch(ESPN_URL, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
-      const body = await res.text();
-      console.error(`[fetch-scores] upstream ${res.status}:`, body);
+      console.error(`[fetch-scores] ESPN ${res.status}`);
       return new Response('upstream error', { status: 502 });
     }
-    const data = (await res.json()) as { matches: FDMatch[] };
-    matches = data.matches ?? [];
+    const data = (await res.json()) as { events?: ESPNEvent[] };
+    events = data.events ?? [];
   } catch (err) {
-    console.error('[fetch-scores] fetch failed:', err);
+    console.error('[fetch-scores] ESPN fetch failed:', err);
     return new Response('fetch error', { status: 500 });
   }
 
-  // Build the scores payload in our format
-  const scores: Record<string, {
+  const newScores: Record<string, {
     home?: number; away?: number; status: string;
     homePenalty?: number; awayPenalty?: number;
   }> = {};
 
-  for (const m of matches) {
-    if (m.status !== 'FINISHED' && m.status !== 'IN_PLAY' && m.status !== 'PAUSED') {
-      continue;
-    }
+  for (const evt of events) {
+    const comp   = evt.competitions[0];
+    const state  = comp.status.type.state;      // 'pre' | 'in' | 'post'
+    const isLive = state === 'in';
+    const isDone = state === 'post';
 
-    const isFinished = m.status === 'FINISHED';
-    const status     = isFinished ? 'completed' : 'live';
+    if (!isLive && !isDone) continue;
 
-    // Best available score: fullTime first, then halfTime (available from 45'+)
-    // Free tier has a ~10 min delay, so during early first half both may be null.
-    const ft   = m.score.fullTime;
-    const ht   = m.score.halfTime;
-    const home = ft.home !== null ? ft.home
-               : ht?.home !== null ? ht!.home!
-               : undefined;
-    const away = ft.away !== null ? ft.away
-               : ht?.away !== null ? ht!.away!
-               : undefined;
+    // Get home/away teams by homeAway field (don't assume array order)
+    const homeC = comp.competitors.find(c => c.homeAway === 'home');
+    const awayC = comp.competitors.find(c => c.homeAway === 'away');
+    if (!homeC || !awayC) continue;
 
-    // Skip finished matches with no score (data issue — shouldn't happen)
-    if (isFinished && (home === undefined || away === undefined)) {
-      console.warn(`[fetch-scores] FINISHED with no score: ${m.homeTeam.tla} v ${m.awayTeam.tla}`);
-      continue;
-    }
-    // For live matches: always include even if score is not available yet,
-    // so the UI can show the "Live" indicator.
+    const hAbb = homeC.team.abbreviation?.toUpperCase();
+    const aAbb = awayC.team.abbreviation?.toUpperCase();
+    const hId  = TEAM_BY_ABB[hAbb];
+    const aId  = TEAM_BY_ABB[aAbb];
 
-    // --- Find our internal match ID ---
-    let ourId: number | undefined;
-
-    // 1. Try by team codes (works for all matches where teams are known)
-    const hId = TEAM_BY_TLA[m.homeTeam.tla?.toUpperCase()];
-    const aId = TEAM_BY_TLA[m.awayTeam.tla?.toUpperCase()];
-    if (hId && aId) {
-      ourId = BY_TEAMS.get(`${hId}:${aId}`);
-    }
-
-    // 2. Fall back to UTC time (for knockout matches before team mapping is known,
-    //    and for any team TLA mismatch). Tolerance: ±5 min.
+    // Find our internal match ID: team pair first, UTC time as fallback
+    let ourId = (hId && aId) ? BY_TEAMS.get(`${hId}:${aId}`) : undefined;
     if (ourId === undefined) {
-      const apiMin = Math.round(new Date(m.utcDate).getTime() / 60000);
-      for (let delta = 0; delta <= 5; delta++) {
-        ourId = BY_TIME.get(apiMin + delta) ?? BY_TIME.get(apiMin - delta);
+      const evtMin = Math.round(new Date(evt.date).getTime() / 60000);
+      for (let d = 0; d <= 10; d++) {
+        ourId = BY_TIME.get(evtMin + d) ?? BY_TIME.get(evtMin - d);
         if (ourId !== undefined) break;
       }
     }
 
     if (ourId === undefined) {
-      console.warn(`[fetch-scores] no match found for ${m.homeTeam.tla} vs ${m.awayTeam.tla} @ ${m.utcDate}`);
+      console.warn(`[fetch-scores] no match found: ${hAbb} vs ${aAbb} @ ${evt.date}`);
       continue;
     }
 
-    const entry: typeof scores[string] = { status };
-    if (home !== undefined && away !== undefined) {
-      entry.home = home;
-      entry.away = away;
+    const homeScore = parseInt(homeC.score, 10);
+    const awayScore = parseInt(awayC.score, 10);
+    const entry: typeof newScores[string] = { status: isDone ? 'completed' : 'live' };
+
+    if (!isNaN(homeScore) && !isNaN(awayScore)) {
+      entry.home = homeScore;
+      entry.away = awayScore;
     }
-    if (m.score.penalties?.home != null && m.score.penalties.away != null) {
-      entry.homePenalty = m.score.penalties.home;
-      entry.awayPenalty = m.score.penalties.away;
-    }
-    scores[String(ourId)] = entry;
+
+    newScores[String(ourId)] = entry;
   }
 
-  // Write to Netlify Blobs
-  try {
-    const store = getStore('scores');
-    await store.setJSON('latest', { updated: new Date().toISOString(), scores });
-    console.log(`[fetch-scores] saved ${Object.keys(scores).length} result(s)`);
-  } catch (err) {
-    console.error('[fetch-scores] blob write failed:', err);
-    return new Response('blob error', { status: 500 });
-  }
+  // Merge with existing Blobs data so past results are never lost
+  const store = getStore('scores');
+  const existing = await store.get('latest', { type: 'json' }).catch(() => null) as
+    { scores?: Record<string, unknown> } | null;
+  const merged = { ...(existing?.scores ?? {}), ...newScores };
+
+  await store.setJSON('latest', { updated: new Date().toISOString(), scores: merged });
+  console.log(`[fetch-scores] ${Object.keys(newScores).length} updated, ${Object.keys(merged).length} total`);
 
   return new Response('OK');
 }
 
 export const config: Config = {
-  schedule: '*/5 * * * *',  // every 5 minutes
+  schedule: '*/5 * * * *',
 };
