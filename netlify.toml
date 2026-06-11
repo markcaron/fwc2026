@@ -2,6 +2,12 @@
   publish = "dist"
   command = "npm run build"
 
+# ── Environment variables ────────────────────────────────────────────────────
+# Set FOOTBALL_DATA_API_KEY in the Netlify dashboard under
+# Site → Environment Variables. Free tier at:
+#   https://www.football-data.org/client/register
+# The scheduled function (netlify/functions/fetch-scores.mts) uses this key.
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -1,20 +1,18 @@
 /**
  * Runtime configuration.
  *
- * SCORES_URL points at a public JSON file that contains only the matches
- * that have been played so far. Updating that file is all that's needed to
- * push new results — no Netlify rebuild required.
+ * SCORES_URL is the endpoint the frontend fetches at page load and on every
+ * tab focus to get live / completed match scores.
  *
- * Recommended host: a public GitHub Gist.
- *   1. Create a Gist with a file named `scores.json` (use public/scores.json
- *      in this repo as the starting template).
- *   2. Copy the "Raw" URL for the file.
- *   3. Replace the placeholder below with that URL.
+ * In production (Netlify):
+ *   /api/scores is served by netlify/functions/scores.mts which reads from
+ *   Netlify Blobs. The Blobs data is populated every 5 minutes by
+ *   netlify/functions/fetch-scores.mts (a scheduled cron function that calls
+ *   football-data.org using the FOOTBALL_DATA_API_KEY env variable).
  *
- * The app fetches the URL at page load and on every tab focus, so results
- * appear as soon as the user opens or returns to the page.
- *
- * Leave as an empty string to skip fetching (app shows scheduled times only).
+ * In local dev (npm run dev):
+ *   /api/scores won't exist unless you run `netlify dev` instead. The app
+ *   degrades gracefully — a failed fetch returns null and the static schedule
+ *   is shown with no scores. Run `netlify dev` to test the full pipeline locally.
  */
-export const SCORES_URL =
-  'https://gist.githubusercontent.com/markcaron/fwc2026-scores/raw/scores.json';
+export const SCORES_URL = '/api/scores';
