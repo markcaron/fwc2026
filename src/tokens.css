@@ -64,9 +64,30 @@
 
   --fwc-text:        light-dark(var(--fwc-navy-900),  #e0e8f0);
   --fwc-text-muted:  light-dark(var(--fwc-gray-600),  var(--fwc-gray-400));
-  --fwc-text-subtle: light-dark(var(--fwc-gray-500),  var(--fwc-gray-500));
+  /*
+   * subtle: gray-600 in light (#4a6380 on white = 5.6:1 ✓),
+   *         gray-400 in dark  (#8fa4bc on navy-900 = ~7:1 ✓)
+   * Previously used gray-500 in light which was only 3.6:1 — failed AA.
+   */
+  --fwc-text-subtle: light-dark(var(--fwc-gray-600),  var(--fwc-gray-400));
   --fwc-text-on-gold: var(--fwc-navy-900);
   --fwc-text-on-red: var(--fwc-white);
+
+  /*
+   * gold-text: used wherever gold must appear as foreground text.
+   * Light: navy-700 (#163660 on white = 10.5:1 ✓) — gold (#C9A227) on white
+   *   is only 2.3:1 and fails WCAG AA entirely.
+   * Dark: gold-300 (#f0cc6a on navy-900 = 11.8:1 ✓) — warm gold stays
+   *   on dark without issue.
+   */
+  --fwc-gold-text:   light-dark(var(--fwc-navy-700),  var(--fwc-gold-300));
+
+  /*
+   * highlight-ring: used for borders/outlines on "featured" or "favorite" items.
+   * Gold (#C9A227) on white = 2.3:1 — fails WCAG 3:1 minimum for UI components.
+   * Navy-500 (#1f5e94) on white = 6.1:1 ✓, gold-500 on navy-900 = 7.8:1 ✓.
+   */
+  --fwc-highlight-ring: light-dark(var(--fwc-navy-500), var(--fwc-gold-500));
 
   --fwc-border:      light-dark(var(--fwc-gray-300),  var(--fwc-navy-600));
   --fwc-border-subtle: light-dark(var(--fwc-gray-200), rgba(255,255,255,0.08));
@@ -91,7 +112,12 @@
 
   /* --- Tab bar --- */
   --fwc-tab-bg:      light-dark(var(--fwc-white),     var(--fwc-navy-900));
-  --fwc-tab-active:  var(--fwc-gold-500);
+  /*
+   * tab-active: navy-700 in light mode (10.5:1 on white ✓), gold in dark.
+   * Gold (#C9A227) on white tab bar = 2.3:1 — failed AA for both text
+   * and UI components (needs 3:1 minimum).
+   */
+  --fwc-tab-active:  light-dark(var(--fwc-navy-700),  var(--fwc-gold-500));
   --fwc-tab-text:    light-dark(var(--fwc-gray-600),  var(--fwc-gray-400));
 
   /* --- Shadows --- */

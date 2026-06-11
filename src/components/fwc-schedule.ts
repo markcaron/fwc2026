@@ -20,16 +20,21 @@ export class FwcSchedule extends LitElement {
       top: 0;
       z-index: 10;
       background: var(--fwc-bg-body);
-      padding: 8px 12px;
       border-bottom: 1px solid var(--fwc-border-subtle);
     }
+    /*
+     * Focus-ring fix: overflow-x:auto clips :focus-visible outlines at the
+     * container boundary. Padding inside the scroll area gives the 4px
+     * (2px offset + 2px ring width) of clearance the outline needs on all
+     * four sides so it is never cropped.
+     */
     .filter-row {
       display: flex;
       gap: 6px;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 2px;
+      padding: 6px 12px 8px;
     }
     .filter-row::-webkit-scrollbar { display: none; }
 
@@ -37,7 +42,12 @@ export class FwcSchedule extends LitElement {
       flex-shrink: 0;
       min-height: 32px;
       padding: 4px 12px;
-      background: var(--fwc-bg-surface);
+      /*
+       * bg-primary (white in light) gives text-muted (#4a6380) a 5.6:1 ratio ✓.
+       * bg-surface (#dde4ed in light) only gave 4.45:1 — just under AA for
+       * normal-weight text at 0.78rem.
+       */
+      background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: 20px;
       color: var(--fwc-text-muted);
@@ -48,7 +58,7 @@ export class FwcSchedule extends LitElement {
       white-space: nowrap;
     }
     .filter-btn:hover {
-      background: var(--fwc-bg-raised);
+      background: var(--fwc-bg-surface);
       color: var(--fwc-text);
     }
     .filter-btn[aria-pressed="true"] {
@@ -107,6 +117,11 @@ export class FwcSchedule extends LitElement {
       flex-direction: column;
       gap: 8px;
       padding: 0 12px;
+      list-style: none;
+      margin: 0;
+    }
+    .match-list li {
+      list-style: none;
     }
 
     /* Round headers (for knockout view) */

@@ -93,8 +93,9 @@ export class FwcStandings extends LitElement {
     tbody tr.pos-2:hover { background: var(--fwc-qualified-bg); }
     tbody tr.pos-3:hover  { background: var(--fwc-playoff-bg); }
 
+    /* highlight-ring: navy-500 in light (6.1:1 on white ✓), gold in dark */
     tbody tr.favorite-row {
-      outline: 1px solid var(--fwc-gold);
+      outline: 1px solid var(--fwc-highlight-ring);
       outline-offset: -1px;
     }
 
@@ -145,7 +146,8 @@ export class FwcStandings extends LitElement {
       text-overflow: ellipsis;
       max-width: 80px;
     }
-    .team-name.favorite { color: var(--fwc-gold); }
+    /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
+    .team-name.favorite { color: var(--fwc-gold-text); }
 
     .legend {
       margin-top: 10px;

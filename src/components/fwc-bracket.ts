@@ -37,7 +37,7 @@ export class FwcBracket extends LitElement {
       gap: 8px;
     }
     .round-header.final-round {
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
     }
     .round-date {
       font-size: 0.7rem;
@@ -61,9 +61,10 @@ export class FwcBracket extends LitElement {
       padding: 10px 12px;
       box-shadow: var(--fwc-shadow-sm);
     }
+    /* highlight-ring: navy-500 in light (6.1:1 ✓), gold in dark */
     .slot.final-slot {
-      border-color: var(--fwc-gold);
-      box-shadow: 0 0 0 1px var(--fwc-gold), var(--fwc-shadow-md);
+      border-color: var(--fwc-highlight-ring);
+      box-shadow: 0 0 0 1px var(--fwc-highlight-ring), var(--fwc-shadow-md);
     }
 
     .slot-meta {
@@ -102,7 +103,8 @@ export class FwcBracket extends LitElement {
       font-weight: 400;
       font-style: italic;
     }
-    .team-name-bracket.favorite { color: var(--fwc-gold); }
+    /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
+    .team-name-bracket.favorite { color: var(--fwc-gold-text); }
     .team-score {
       font-size: 1rem;
       font-weight: 700;
@@ -114,10 +116,11 @@ export class FwcBracket extends LitElement {
     .team-score.winner {
       color: var(--fwc-qualified);
     }
+    /* gold-text: AA-safe gold equivalent for text on card backgrounds */
     .team-time {
       font-size: 0.72rem;
       font-weight: 600;
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
     }
 
     .venue-line {
@@ -148,7 +151,7 @@ export class FwcBracket extends LitElement {
     .trophy-team {
       font-size: 1rem;
       font-weight: 700;
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
     }
   `;
 

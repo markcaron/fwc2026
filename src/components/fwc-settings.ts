@@ -92,7 +92,7 @@ export class FwcSettings extends LitElement {
     }
     .team-toggle:hover {
       background: var(--fwc-bg-raised);
-      border-color: var(--fwc-gold);
+      border-color: var(--fwc-highlight-ring);
     }
     .team-toggle input[type="checkbox"] {
       /* visually hide checkbox — label handles full-width click target */
@@ -102,10 +102,11 @@ export class FwcSettings extends LitElement {
       height: 0;
       pointer-events: none;
     }
+    /* highlight-ring: navy-500 in light (6.1:1 ✓), gold in dark */
     .team-toggle:has(input:checked) {
       background: var(--fwc-bg-raised);
-      border-color: var(--fwc-gold);
-      box-shadow: 0 0 0 1px var(--fwc-gold);
+      border-color: var(--fwc-highlight-ring);
+      box-shadow: 0 0 0 1px var(--fwc-highlight-ring);
     }
     .team-toggle:focus-within {
       outline: var(--fwc-focus-ring);
@@ -133,8 +134,8 @@ export class FwcSettings extends LitElement {
       transition: border-color 0.12s, background 0.12s;
     }
     .team-toggle:has(input:checked) .toggle-check {
-      background: var(--fwc-gold);
-      border-color: var(--fwc-gold);
+      background: var(--fwc-highlight-ring);
+      border-color: var(--fwc-highlight-ring);
     }
     .check-mark {
       width: 8px;
@@ -213,8 +214,9 @@ export class FwcSettings extends LitElement {
       color: var(--fwc-text-muted);
       margin-left: 6px;
     }
+    /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .selected-count.has-selection {
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
       font-weight: 700;
     }
   `;

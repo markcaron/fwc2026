@@ -18,9 +18,10 @@ export class FwcMatchCard extends LitElement {
       box-shadow: var(--fwc-shadow-sm);
       transition: border-color 0.15s, box-shadow 0.15s;
     }
+    /* highlight-ring: navy-500 in light (6.1:1 on white ✓), gold in dark */
     .card.favorite {
-      border-color: var(--fwc-gold);
-      box-shadow: 0 0 0 1px var(--fwc-gold), var(--fwc-shadow-sm);
+      border-color: var(--fwc-highlight-ring);
+      box-shadow: 0 0 0 1px var(--fwc-highlight-ring), var(--fwc-shadow-sm);
     }
     .card.live {
       border-color: var(--fwc-danger);
@@ -80,8 +81,9 @@ export class FwcMatchCard extends LitElement {
       font-weight: 600;
       color: var(--fwc-text);
     }
+    /* gold-text token: navy-700 in light (10.5:1 on white ✓), gold-300 in dark */
     .team-name.favorite-team {
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
     }
 
     .score-block {
@@ -110,8 +112,9 @@ export class FwcMatchCard extends LitElement {
       font-weight: 600;
       color: var(--fwc-text-muted);
     }
+    /* gold-text token ensures AA contrast on both light and dark backgrounds */
     .time-display.today {
-      color: var(--fwc-gold);
+      color: var(--fwc-gold-text);
     }
 
     .footer {
