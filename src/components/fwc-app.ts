@@ -2,7 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { loadPreferences, updatePreferences } from '../lib/storage.js';
 import { formatMatchTime } from '../lib/time.js';
-import type { StoredPreferences, TabId } from '../lib/types.js';
+import { MATCHES } from '../lib/data.js';
+import { fetchScores, applyScores } from '../lib/scores.js';
+import { SCORES_URL } from '../lib/config.js';
+import type { Match, StoredPreferences, TabId } from '../lib/types.js';
 import type { PreferencesChangedEvent } from './fwc-settings.js';
 import './fwc-schedule.js';
 import './fwc-standings.js';
@@ -198,9 +201,32 @@ export class FwcApp extends LitElement {
 
   @state() private _prefs: StoredPreferences = loadPreferences();
   @state() private _activeTab: TabId = 'schedule';
+  /** Live match data — static MATCHES overlaid with any fetched scores. */
+  @state() private _matches: Match[] = [...MATCHES];
 
   private get _todayLabel(): string {
     return formatMatchTime(new Date().toISOString(), this._prefs.timezone).dateShort;
+  }
+
+  // ── Scores lifecycle ──────────────────────────────────────
+  private async _loadScores(): Promise<void> {
+    const payload = await fetchScores(SCORES_URL);
+    this._matches = applyScores(MATCHES, payload);
+  }
+
+  private _onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') this._loadScores();
+  };
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._loadScores();
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('visibilitychange', this._onVisibilityChange);
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -225,7 +251,7 @@ export class FwcApp extends LitElement {
   }
 
   render() {
-    const { _prefs: prefs, _activeTab: active } = this;
+    const { _prefs: prefs, _activeTab: active, _matches: matches } = this;
 
     return html`
       <a href="#main-content" class="skip-link">Skip to content</a>
@@ -301,6 +327,7 @@ export class FwcApp extends LitElement {
              aria-labelledby="tab-schedule"
              ?data-active="${active === 'schedule'}" tabindex="0">
           <fwc-schedule
+            .matchData="${matches}"
             .timezone="${prefs.timezone}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
           ></fwc-schedule>
@@ -310,6 +337,7 @@ export class FwcApp extends LitElement {
              aria-labelledby="tab-groups"
              ?data-active="${active === 'groups'}" tabindex="0">
           <fwc-standings
+            .matchData="${matches}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
           ></fwc-standings>
         </div>
@@ -318,6 +346,7 @@ export class FwcApp extends LitElement {
              aria-labelledby="tab-bracket"
              ?data-active="${active === 'bracket'}" tabindex="0">
           <fwc-bracket
+            .matchData="${matches}"
             .timezone="${prefs.timezone}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
           ></fwc-bracket>

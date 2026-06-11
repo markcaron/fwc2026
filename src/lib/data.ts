@@ -227,18 +227,25 @@ export function getTeamsInGroup(group: string): Team[] {
   return TEAMS.filter(t => t.group === group);
 }
 
-export function getMatchesInGroup(group: string): Match[] {
-  return MATCHES.filter(m => m.round === 'group' && m.group === group);
+/**
+ * Returns group-stage matches for a given group.
+ * Pass `matches` to use a live-data array instead of the static constant.
+ */
+export function getMatchesInGroup(group: string, matches: readonly Match[] = MATCHES): Match[] {
+  return matches.filter(m => m.round === 'group' && m.group === group);
 }
 
-/** Compute standings for a group from completed match data */
-export function computeStandings(group: string): GroupStanding[] {
+/**
+ * Compute standings for a group from completed match data.
+ * Pass `matches` to compute from a live-data array instead of static data.
+ */
+export function computeStandings(group: string, matches: readonly Match[] = MATCHES): GroupStanding[] {
   const teams = getTeamsInGroup(group);
   const standings = new Map<string, GroupStanding>(
     teams.map(t => [t.id, { teamId: t.id, played:0, won:0, drawn:0, lost:0, gf:0, ga:0, gd:0, points:0 }])
   );
 
-  for (const match of getMatchesInGroup(group)) {
+  for (const match of getMatchesInGroup(group, matches)) {
     if (match.status !== 'completed' || match.homeScore === null || match.awayScore === null) continue;
     const home = standings.get(match.homeId!);
     const away = standings.get(match.awayId!);

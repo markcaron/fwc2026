@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { GROUPS, TEAMS_BY_ID, computeStandings } from '../lib/data.js';
-import type { GroupStanding } from '../lib/types.js';
+import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings } from '../lib/data.js';
+import type { Match, GroupStanding } from '../lib/types.js';
 
 @customElement('fwc-standings')
 export class FwcStandings extends LitElement {
@@ -168,6 +168,7 @@ export class FwcStandings extends LitElement {
     .legend-dot.playoff   { background: var(--fwc-playoff); }
   `;
 
+  @property({ type: Array }) matchData: Match[] = [...MATCHES];
   @property({ type: Array }) favoriteTeamIds: string[] = [];
 
   render() {
@@ -191,7 +192,7 @@ export class FwcStandings extends LitElement {
   }
 
   private _renderGroup(group: string) {
-    const standings: GroupStanding[] = computeStandings(group);
+    const standings: GroupStanding[] = computeStandings(group, this.matchData);
 
     return html`
       <div class="group-card">

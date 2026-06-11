@@ -266,6 +266,8 @@ export class FwcSchedule extends LitElement {
     }
   `;
 
+  /** Live match array passed down from fwc-app (static MATCHES + fetched scores). */
+  @property({ type: Array }) matchData: Match[] = [...MATCHES];
   @property({ type: String }) timezone = 'America/New_York';
   @property({ type: Array }) favoriteTeamIds: string[] = [];
 
@@ -281,7 +283,7 @@ export class FwcSchedule extends LitElement {
   private _getMatchDays(): string[] {
     const tz = this.timezone;
     const days = new Set<string>();
-    for (const m of MATCHES) {
+    for (const m of this.matchData) {
       days.add(getLocalDateString(m.utc, tz));
     }
     return [...days].sort();
@@ -312,22 +314,22 @@ export class FwcSchedule extends LitElement {
     const dateOf = (m: Match) => getLocalDateString(m.utc, tz);
     switch (type) {
       case 'today':
-        return MATCHES.filter(m => dateOf(m) === getTodayString(tz));
+        return this.matchData.filter(m => dateOf(m) === getTodayString(tz));
       case 'date':
-        return MATCHES.filter(m => dateOf(m) === value);
+        return this.matchData.filter(m => dateOf(m) === value);
       case 'favorites':
-        return MATCHES.filter(m =>
+        return this.matchData.filter(m =>
           (m.homeId && this.favoriteTeamIds.includes(m.homeId)) ||
           (m.awayId && this.favoriteTeamIds.includes(m.awayId))
         );
       case 'group':
-        return MATCHES.filter(m => m.round === 'group' && m.group === value);
+        return this.matchData.filter(m => m.round === 'group' && m.group === value);
       case 'team':
-        return MATCHES.filter(m => m.homeId === value || m.awayId === value);
+        return this.matchData.filter(m => m.homeId === value || m.awayId === value);
       case 'round':
-        return MATCHES.filter(m => m.round === value);
+        return this.matchData.filter(m => m.round === value);
       default:
-        return [...MATCHES];
+        return [...this.matchData];
     }
   }
 

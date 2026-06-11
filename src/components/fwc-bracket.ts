@@ -151,6 +151,7 @@ export class FwcBracket extends LitElement {
     }
   `;
 
+  @property({ type: Array }) matchData: Match[] = [...MATCHES];
   @property({ type: String }) timezone = 'America/New_York';
   @property({ type: Array }) favoriteTeamIds: string[] = [];
 
@@ -166,13 +167,13 @@ export class FwcBracket extends LitElement {
     ];
     return defs.map(d => ({
       ...d,
-      matches: d.matchIds.map(id => MATCHES.find(m => m.id === id)).filter(Boolean) as Match[],
+      matches: d.matchIds.map(id => this.matchData.find(m => m.id === id)).filter(Boolean) as Match[],
     }));
   }
 
   render() {
     const rounds = this._rounds;
-    const finalMatch = MATCHES.find(m => m.id === 104);
+    const finalMatch = this.matchData.find(m => m.id === 104);
     const champion = finalMatch?.status === 'completed' && finalMatch.homeScore !== null && finalMatch.awayScore !== null
       ? finalMatch.homeScore > finalMatch.awayScore
         ? TEAMS_BY_ID.get(finalMatch.homeId!)
