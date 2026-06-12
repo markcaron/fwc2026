@@ -52,7 +52,7 @@ export class FwcSchedule extends LitElement {
       position: relative;
       display: inline-flex;
       align-items: center;
-      flex: 1;               /* expands to fill available width in the row */
+      flex: 1;
       min-width: 120px;
       max-width: 280px;
     }
@@ -68,7 +68,7 @@ export class FwcSchedule extends LitElement {
     .search-input {
       width: 100%;
       min-height: 36px;
-      padding: 0 32px 0 30px;  /* left: icon, right: clear btn */
+      padding: 0 32px 0 30px;
       background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: 20px;
@@ -83,10 +83,8 @@ export class FwcSchedule extends LitElement {
       outline-offset: var(--fwc-focus-offset);
       border-color: var(--fwc-accent);
     }
-    /* Active — has a query */
-    .search-input:not(:placeholder-shown) {
-      border-color: var(--fwc-accent);
-    }
+    /* Active only when there is a real (non-whitespace) query (#15) */
+    .search-input.has-query { border-color: var(--fwc-accent); }
     .search-clear {
       position: absolute;
       right: 6px;
@@ -109,6 +107,17 @@ export class FwcSchedule extends LitElement {
       outline-offset: var(--fwc-focus-offset);
     }
     .search-clear svg { width: 10px; height: 10px; }
+
+    /* Visually hidden live region for screen reader result announcements */
+    .search-status {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
 
     /* ── Toggle buttons ─────────────────────────────────────── */
     .filter-btn {
@@ -426,6 +435,8 @@ export class FwcSchedule extends LitElement {
 
   /** Current search query — drives the 'search' filter type. */
   @state() private _searchQuery = '';
+  /** Filter active before search was initiated — restored on Escape / clear. */
+  @state() private _preSearchFilter: ScheduleFilter = { type: 'today' };
 
   @query('.search-input') private _searchEl?: HTMLInputElement;
 
@@ -543,7 +554,12 @@ export class FwcSchedule extends LitElement {
     }
   }
 
-  private _set(filter: ScheduleFilter) { this._filter = filter; }
+  private _set(filter: ScheduleFilter) {
+    // Clearing the query when switching away from search prevents a stale
+    // "Brazil" showing in the input after the user clicks a filter chip (#15)
+    if (filter.type !== 'search') this._searchQuery = '';
+    this._filter = filter;
+  }
 
   render() {
     const filtered = this._filteredMatches;
@@ -581,6 +597,12 @@ export class FwcSchedule extends LitElement {
         <div class="nav-announce" aria-live="polite" aria-atomic="true">
           ${this._announcement}
         </div>
+        <!-- Live region: announces search result count to screen readers -->
+        <div class="search-status" aria-live="polite" aria-atomic="true">
+          ${isSearch && this._searchQuery.trim()
+            ? `${filtered.length} match${filtered.length !== 1 ? 'es' : ''} found for "${this._searchQuery.trim()}"`
+            : ''}
+        </div>
 
         <!-- ── Filter bar ────────────────────────────────── -->
         <div class="filter-bar">
@@ -599,28 +621,35 @@ export class FwcSchedule extends LitElement {
               @click="${() => this._set({ type: 'today' })}"
             >Today</button>
 
-            <!-- Search input — right after Today, expands to fill remaining space -->
-            <div class="search-wrap" role="search">
+            <!-- Search — role="search" omitted (landmark scope is the full region above) -->
+            <div class="search-wrap">
               <svg class="search-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>
                 <path d="M9 9l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
               <input
-                class="search-input"
+                class="search-input ${this._searchQuery.trim() ? 'has-query' : ''}"
                 type="text"
-                placeholder="Search teams…"
-                aria-label="Search matches by team name"
+                placeholder="Search teams, cities…"
+                aria-label="Search by team, city, or venue"
                 autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
                 .value="${this._searchQuery}"
                 @input="${(e: Event) => {
                   const q = (e.target as HTMLInputElement).value;
+                  // Capture current filter before switching to search so we
+                  // can restore it when the user cancels (#15)
+                  if (this._filter.type !== 'search' && q.trim()) {
+                    this._preSearchFilter = { ...this._filter };
+                  }
                   this._searchQuery = q;
-                  this._set(q.trim() ? { type: 'search' } : { type: 'all' });
+                  this._set(q.trim() ? { type: 'search' } : this._preSearchFilter);
                 }}"
                 @keydown="${(e: KeyboardEvent) => {
                   if (e.key === 'Escape') {
-                    this._searchQuery = '';
-                    this._set({ type: 'all' });
+                    this._set(this._preSearchFilter); // restores Today/All/etc.
                     this._searchEl?.blur();
                   }
                 }}"
@@ -630,8 +659,7 @@ export class FwcSchedule extends LitElement {
                   class="search-clear"
                   aria-label="Clear search"
                   @click="${() => {
-                    this._searchQuery = '';
-                    this._set({ type: 'all' });
+                    this._set(this._preSearchFilter); // restores Today/All/etc.
                     this._searchEl?.focus();
                   }}"
                 >
