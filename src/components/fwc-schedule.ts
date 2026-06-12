@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 import { MATCHES, TEAMS, GROUPS, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
@@ -434,6 +434,8 @@ export class FwcSchedule extends LitElement {
     input.type = 'date';
     input.tabIndex = -1;
     input.setAttribute('aria-hidden', 'true');
+    // Start off-screen; repositioned to the button before showPicker() so the
+    // desktop picker popup appears at the right location.
     input.style.cssText =
       'position:fixed;top:0;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
     input.addEventListener('change', this._onLightInputChange);
@@ -446,6 +448,18 @@ export class FwcSchedule extends LitElement {
     this._lightInput?.removeEventListener('change', this._onLightInputChange);
     this._lightInput?.remove();
     this._lightInput = null;
+  }
+
+  /** Reposition the light-DOM input under the button on pointerdown so the
+   *  layout is committed before showPicker() is called on click. */
+  private _positionLightInput(): void {
+    const input = this._lightInput;
+    const btn = this.shadowRoot?.querySelector<HTMLElement>('.date-pick-btn');
+    if (!input || !btn) return;
+    const r = btn.getBoundingClientRect();
+    input.style.cssText =
+      `position:fixed;top:${r.bottom}px;left:${r.left}px;` +
+      `width:${r.width}px;height:1px;opacity:0;pointer-events:none;`;
   }
 
   private _openDatePicker(): void {
@@ -818,6 +832,7 @@ export class FwcSchedule extends LitElement {
                             class="date-pick-btn"
                             type="button"
                             aria-label="Pick a match date"
+                            @pointerdown="${() => this._positionLightInput()}"
                             @click="${() => this._openDatePicker()}"
                           >
                             <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
