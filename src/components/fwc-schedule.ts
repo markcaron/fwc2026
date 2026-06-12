@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 import { MATCHES, TEAMS, GROUPS } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
@@ -213,7 +213,21 @@ export class FwcSchedule extends LitElement {
       align-items: center;
       gap: 8px;
       min-width: 0;
+    }
+    /* Centering only in single-day (navigable) view, not all-matches list */
+    .day-header--navigable .day-header-content {
       justify-content: center;
+    }
+
+    /* Visually hidden live region for AT announcements on view change */
+    .nav-announce {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /*
@@ -244,6 +258,10 @@ export class FwcSchedule extends LitElement {
     .date-pick-btn:hover {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
+      border-color: var(--fwc-accent);
+    }
+    .date-pick-btn:active {
+      background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
     .date-pick-btn:focus-visible {
@@ -323,6 +341,19 @@ export class FwcSchedule extends LitElement {
 
   /** Single source of truth — all select bindings derive from this. */
   @state() private _filter: ScheduleFilter = { type: 'today' };
+  /** Text announced to screen readers when the schedule view changes. */
+  @state() private _announcement = '';
+
+  /** Ref to the hidden date input — avoids fragile parentElement traversal. */
+  @query('.date-input-hidden') private _dateInput?: HTMLInputElement;
+
+  /** Tournament bounds derived from the fixture list — never hardcoded. */
+  private get _minDate(): string {
+    return this.matchData.reduce((a, b) => a.utc < b.utc ? a : b).utc.slice(0, 10);
+  }
+  private get _maxDate(): string {
+    return this.matchData.reduce((a, b) => a.utc > b.utc ? a : b).utc.slice(0, 10);
+  }
 
   // ── Derived select bindings ───────────────────────────────
   private get _groupValue() { return this._filter.type === 'group' ? (this._filter.value ?? '') : ''; }
@@ -348,6 +379,7 @@ export class FwcSchedule extends LitElement {
 
   private _navigateDay(delta: 1 | -1): void {
     const days = this._getMatchDays();
+    if (!days.length) return;
     const current = this._viewingDate;
     const idx = days.indexOf(current);
     const clamped = Math.max(0, Math.min(days.length - 1, idx + delta));
@@ -356,17 +388,21 @@ export class FwcSchedule extends LitElement {
     this._filter = newDate === today
       ? { type: 'today' }
       : { type: 'date', value: newDate };
+    this._announce(newDate);
   }
 
   /** Navigate to a specific date string (YYYY-MM-DD).
-   *  If there are no matches on that exact date, clamp to the nearest match day. */
+   *  If there are no matches on that exact date, snaps to the nearest match day.
+   *  Announces the resulting date to assistive technologies. */
   private _navigateToDate(dateStr: string): void {
     const days = this._getMatchDays();
+    if (!days.length) return;                        // guard against empty array
     const today = getTodayString(this.timezone);
     // If an exact match exists, use it; otherwise find the nearest day
     const exact = days.find(d => d === dateStr);
     if (exact) {
       this._filter = exact === today ? { type: 'today' } : { type: 'date', value: exact };
+      this._announce(exact, exact !== dateStr);
       return;
     }
     // Find closest day by date arithmetic
@@ -378,6 +414,16 @@ export class FwcSchedule extends LitElement {
       if (diff < minDiff) { minDiff = diff; nearest = d; }
     }
     this._filter = nearest === today ? { type: 'today' } : { type: 'date', value: nearest };
+    this._announce(nearest, true /* snapped */);
+  }
+
+  /** Update the live-region announcement after a navigation. */
+  private _announce(dateStr: string, snapped = false): void {
+    const fmt = formatMatchTime(dateStr + 'T12:00:00Z', this.timezone);
+    const label = `Showing matches for ${fmt.dayOfWeek}, ${fmt.dateShort}`;
+    this._announcement = snapped
+      ? `${label} (nearest match day)`
+      : label;
   }
 
   private get _filteredMatches(): Match[] {
@@ -414,6 +460,8 @@ export class FwcSchedule extends LitElement {
     const { type } = this._filter;
     const isSingleDay = type === 'today' || type === 'date';
     const hasFavorites = this.favoriteTeamIds.length > 0;
+    const minDate = this._minDate;
+    const maxDate = this._maxDate;
 
     // Day nav state — only matters in single-day view
     const matchDays = isSingleDay ? this._getMatchDays() : [];
@@ -436,6 +484,10 @@ export class FwcSchedule extends LitElement {
 
     return html`
       <div role="region" aria-label="Match schedule">
+        <!-- Live region: announces view changes to screen readers (WCAG 4.1.3) -->
+        <div class="nav-announce" aria-live="polite" aria-atomic="true">
+          ${this._announcement}
+        </div>
 
         <!-- ── Filter bar ────────────────────────────────── -->
         <div class="filter-bar">
@@ -563,13 +615,8 @@ export class FwcSchedule extends LitElement {
                         <div class="date-pick-wrap">
                           <button
                             class="date-pick-btn"
-                            aria-label="Jump to date"
-                            title="Jump to date"
-                            @click="${(e: Event) => {
-                              const wrap = (e.currentTarget as HTMLElement).parentElement!;
-                              const inp = wrap.querySelector<HTMLInputElement>('.date-input-hidden');
-                              inp?.showPicker?.();
-                            }}"
+                            aria-label="Pick a match date"
+                            @click="${() => this._dateInput?.showPicker?.()}"
                           >
                             <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
                               <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
@@ -582,8 +629,8 @@ export class FwcSchedule extends LitElement {
                             class="date-input-hidden"
                             type="date"
                             .value="${viewDate}"
-                            min="2026-06-11"
-                            max="2026-07-19"
+                            min="${minDate}"
+                            max="${maxDate}"
                             tabindex="-1"
                             aria-hidden="true"
                             @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
