@@ -296,56 +296,62 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker: the visible button triggers showPicker()
-     * on a hidden <input type="date">. The text label stays human-readable
-     * (e.g. "Thursday, Jun 11") while the icon gives access to the picker.
+     * Date picker: Shadow DOM <input type="date"> is the primary interactive
+     * element, sized to exactly match the wrapper. An aria-hidden ghost <span>
+     * (pointer-events:none) sits on top and renders the calendar-button
+     * appearance. Clicks/taps pass through the ghost to the input below.
+     * No light DOM, no showPicker(), no state management needed.
      */
     .date-pick-wrap {
       position: relative;
       display: inline-flex;
-      align-items: center;
+      width: 36px;
+      height: 36px;
       flex-shrink: 0;
     }
-    .date-pick-btn {
+    /* The real interactive element — invisible, fills the wrapper exactly */
+    .date-pick-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      color: transparent;
+      border: none;
+      outline: none;
+      cursor: pointer;
+    }
+    .date-pick-input::-webkit-calendar-picker-indicator { opacity: 0; }
+    /* Ghost: the visible "button" — pointer-events:none so clicks fall through */
+    .date-pick-ghost {
+      position: absolute;
+      inset: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 36px;
-      min-height: 36px;
-      background: none;
+      background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
       color: var(--fwc-text-muted);
-      cursor: pointer;
-      font-family: inherit;
+      pointer-events: none;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .date-pick-btn:hover {
+    .date-pick-ghost svg { width: 18px; height: 18px; }
+    /* Pseudo-states driven via :has() since the ghost has pointer-events:none */
+    .date-pick-wrap:hover .date-pick-ghost {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:active {
+    .date-pick-wrap:has(.date-pick-input:active) .date-pick-ghost {
       background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:focus-visible {
+    .date-pick-wrap:has(.date-pick-input:focus-visible) .date-pick-ghost {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
-    }
-    .date-pick-btn svg { width: 18px; height: 18px; }
-    /*
-     * Hidden input is anchored at the BOTTOM of the wrapper so the browser
-     * positions the native date picker popup below the button, not over it.
-     */
-    .date-input-hidden {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
     }
 
     /*
@@ -414,9 +420,6 @@ export class FwcSchedule extends LitElement {
   @state() private _filter: ScheduleFilter = { type: 'today' };
   /** Text announced to screen readers when the schedule view changes. */
   @state() private _announcement = '';
-
-  /** Ref to the hidden date input — avoids fragile parentElement traversal. */
-  @query('.date-input-hidden') private _dateInput?: HTMLInputElement;
 
   /** Tournament bounds derived from the fixture list — never hardcoded. */
   private get _minDate(): string {
@@ -511,13 +514,15 @@ export class FwcSchedule extends LitElement {
     this._announce(nearest, true /* snapped */);
   }
 
-  /** Update the live-region announcement after a navigation. */
+  /** Update the live-region announcement after a navigation.
+   *  Resets to '' first so re-picking the same date still triggers a
+   *  new DOM mutation that AT will announce (WCAG 4.1.3). */
   private _announce(dateStr: string, snapped = false): void {
     const fmt = formatMatchTime(dateStr + 'T12:00:00Z', this.timezone);
     const label = `Showing matches for ${fmt.dayOfWeek}, ${fmt.dateShort}`;
-    this._announcement = snapped
-      ? `${label} (nearest match day)`
-      : label;
+    const text = snapped ? `${label} (nearest match day)` : label;
+    this._announcement = '';
+    Promise.resolve().then(() => { this._announcement = text; });
   }
 
   private get _filteredMatches(): Match[] {
@@ -781,28 +786,24 @@ export class FwcSchedule extends LitElement {
                         : nothing}
                       ${isSingleDay ? html`
                         <div class="date-pick-wrap">
-                          <button
-                            class="date-pick-btn"
+                          <input
+                            class="date-pick-input"
+                            type="date"
                             aria-label="Pick a match date"
-                            @click="${() => this._dateInput?.showPicker?.()}"
-                          >
+                            .value="${viewDate}"
+                            min="${minDate}"
+                            max="${maxDate}"
+                            @change="${(e: Event) =>
+                              this._navigateToDate((e.target as HTMLInputElement).value)}"
+                          />
+                          <span class="date-pick-ghost" aria-hidden="true">
                             <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
                               <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
                               <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
                               <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                               <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                             </svg>
-                          </button>
-                          <input
-                            class="date-input-hidden"
-                            type="date"
-                            .value="${viewDate}"
-                            min="${minDate}"
-                            max="${maxDate}"
-                            tabindex="-1"
-                            aria-hidden="true"
-                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
-                          />
+                          </span>
                         </div>
                       ` : nothing}
                       <span class="count-label">
