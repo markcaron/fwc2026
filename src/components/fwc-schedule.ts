@@ -296,15 +296,19 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker: the visible button triggers showPicker()
-     * on a hidden <input type="date">. The text label stays human-readable
-     * (e.g. "Thursday, Jun 11") while the icon gives access to the picker.
+     * Calendar-icon date picker: a <label> wraps the visible button and the
+     * hidden input so native label→input activation opens the picker. This
+     * bypasses showPicker() which silently fails on iOS Safari inside a
+     * Shadow Root. The button also calls _dateInput.click() directly for
+     * keyboard users (Space/Enter on the button), since clicking an
+     * interactive element inside a <label> does not trigger label activation.
      */
     .date-pick-wrap {
       position: relative;
       display: inline-flex;
       align-items: center;
       flex-shrink: 0;
+      cursor: pointer;
     }
     .date-pick-btn {
       display: inline-flex;
@@ -337,6 +341,8 @@ export class FwcSchedule extends LitElement {
     /*
      * Hidden input is anchored at the BOTTOM of the wrapper so the browser
      * positions the native date picker popup below the button, not over it.
+     * pointer-events is intentionally NOT none — the label association needs
+     * the input to be activatable by the browser's native label click routing.
      */
     .date-input-hidden {
       position: absolute;
@@ -345,7 +351,6 @@ export class FwcSchedule extends LitElement {
       width: 1px;
       height: 1px;
       opacity: 0;
-      pointer-events: none;
     }
 
     /*
@@ -780,11 +785,12 @@ export class FwcSchedule extends LitElement {
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
                       ${isSingleDay ? html`
-                        <div class="date-pick-wrap">
+                        <label class="date-pick-wrap">
                           <button
                             class="date-pick-btn"
+                            type="button"
                             aria-label="Pick a match date"
-                            @click="${() => this._dateInput?.showPicker?.()}"
+                            @click="${() => this._dateInput?.click()}"
                           >
                             <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
                               <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
@@ -803,7 +809,7 @@ export class FwcSchedule extends LitElement {
                             aria-hidden="true"
                             @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
                           />
-                        </div>
+                        </label>
                       ` : nothing}
                       <span class="count-label">
                         ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
