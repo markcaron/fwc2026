@@ -296,53 +296,46 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker: a <label> wraps the visible button and the
-     * hidden input so native label→input activation opens the picker. This
-     * bypasses showPicker() which silently fails on iOS Safari inside a
-     * Shadow Root. The button also calls _dateInput.click() directly for
-     * keyboard users (Space/Enter on the button), since clicking an
-     * interactive element inside a <label> does not trigger label activation.
+     * Calendar-icon date picker: the <label> IS the visible interactive
+     * element — there is no nested <button>. This is critical for iOS Safari:
+     * when a <label> contains no interactive child, tapping it fires native
+     * label→input activation, which reliably opens the date picker through a
+     * Shadow Root. Both showPicker() and programmatic .click() fail in Shadow
+     * DOM on iOS even when called from a synchronous user gesture handler.
+     * Keyboard users activate via Space/Enter → @keydown → _dateInput.click().
      */
     .date-pick-wrap {
       position: relative;
       display: inline-flex;
       align-items: center;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-    .date-pick-btn {
-      display: inline-flex;
-      align-items: center;
       justify-content: center;
       min-width: 36px;
       min-height: 36px;
+      flex-shrink: 0;
       background: none;
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
       color: var(--fwc-text-muted);
       cursor: pointer;
-      font-family: inherit;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .date-pick-btn:hover {
+    .date-pick-wrap:hover {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:active {
+    .date-pick-wrap:active {
       background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:focus-visible {
+    .date-pick-wrap:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-btn svg { width: 18px; height: 18px; }
+    .date-pick-wrap svg { width: 18px; height: 18px; }
     /*
-     * Hidden input is anchored at the BOTTOM of the wrapper so the browser
-     * positions the native date picker popup below the button, not over it.
-     * pointer-events is intentionally NOT none — the label association needs
-     * the input to be activatable by the browser's native label click routing.
+     * Hidden input anchored BELOW the wrapper so desktop browsers position
+     * the date picker popup below the label, not over it.
      */
     .date-input-hidden {
       position: absolute;
@@ -351,6 +344,7 @@ export class FwcSchedule extends LitElement {
       width: 1px;
       height: 1px;
       opacity: 0;
+      pointer-events: none;
     }
 
     /*
@@ -516,13 +510,15 @@ export class FwcSchedule extends LitElement {
     this._announce(nearest, true /* snapped */);
   }
 
-  /** Update the live-region announcement after a navigation. */
+  /** Update the live-region announcement after a navigation.
+   *  Resets to '' first so re-picking the same date still triggers a
+   *  new DOM mutation that AT will announce (WCAG 4.1.3). */
   private _announce(dateStr: string, snapped = false): void {
     const fmt = formatMatchTime(dateStr + 'T12:00:00Z', this.timezone);
     const label = `Showing matches for ${fmt.dayOfWeek}, ${fmt.dateShort}`;
-    this._announcement = snapped
-      ? `${label} (nearest match day)`
-      : label;
+    const text = snapped ? `${label} (nearest match day)` : label;
+    this._announcement = '';
+    Promise.resolve().then(() => { this._announcement = text; });
   }
 
   private get _filteredMatches(): Match[] {
@@ -785,20 +781,24 @@ export class FwcSchedule extends LitElement {
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
                       ${isSingleDay ? html`
-                        <label class="date-pick-wrap">
-                          <button
-                            class="date-pick-btn"
-                            type="button"
-                            aria-label="Pick a match date"
-                            @click="${() => this._dateInput?.click()}"
-                          >
-                            <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                              <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-                              <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
-                              <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                              <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                            </svg>
-                          </button>
+                        <label
+                          class="date-pick-wrap"
+                          tabindex="0"
+                          role="button"
+                          aria-label="Pick a match date"
+                          @keydown="${(e: KeyboardEvent) => {
+                            if (e.key === ' ' || e.key === 'Enter') {
+                              e.preventDefault();
+                              this._dateInput?.click();
+                            }
+                          }}"
+                        >
+                          <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                            <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                            <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
+                            <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                            <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                          </svg>
                           <input
                             class="date-input-hidden"
                             type="date"
