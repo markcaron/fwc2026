@@ -3,6 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { TEAMS, GROUPS } from '../lib/data.js';
 import { TIMEZONE_GROUPS } from '../lib/time.js';
 import type { StoredPreferences } from '../lib/types.js';
+import { CARET } from '../lib/icons.js';
 
 export class PreferencesChangedEvent extends Event {
   static readonly eventName = 'preferences-changed' as const;
@@ -50,23 +51,49 @@ export class FwcSettings extends LitElement {
       margin-top: 4px;
     }
 
-    select {
+    /* Timezone select — chip-wrap pattern mirrors fwc-schedule.ts select chips */
+    .tz-chip-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: stretch;
+      width: 100%;
+    }
+    .tz-chip-wrap select {
+      appearance: none;
+      -webkit-appearance: none;
       width: 100%;
       min-height: 44px;
-      padding: 8px 12px;
+      padding: 0 44px 0 14px;
       background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
-      border-radius: var(--fwc-radius-sm);
+      border-radius: 20px;
       color: var(--fwc-text);
       font-size: 0.88rem;
+      font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      appearance: auto;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    select:focus-visible {
+    .tz-chip-wrap select:hover {
+      background: var(--fwc-bg-surface);
+      color: var(--fwc-text);
+    }
+    .tz-chip-wrap select:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
+    .tz-chip-wrap .chip-caret {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 6px;
+      pointer-events: none;
+      color: var(--fwc-text-muted);
+      transition: color 0.15s;
+    }
+    .tz-chip-wrap:has(select:hover) .chip-caret { color: var(--fwc-text); }
 
     /* Favorite teams grid */
     .teams-grid {
@@ -256,21 +283,24 @@ export class FwcSettings extends LitElement {
           <div class="section-title">Time Zone</div>
           <div class="field">
             <label for="tz-select">Display match times in</label>
-            <select
-              id="tz-select"
-              .value="${timezone}"
-              @change="${this._onTimezoneChange}"
-            >
-              ${TIMEZONE_GROUPS.map(g => html`
-                <optgroup label="${g.label}">
-                  ${g.zones.map(z => html`
-                    <option value="${z.value}" ?selected="${z.value === timezone}">
-                      ${z.label}
-                    </option>
-                  `)}
-                </optgroup>
-              `)}
-            </select>
+            <div class="tz-chip-wrap">
+              <select
+                id="tz-select"
+                .value="${timezone}"
+                @change="${this._onTimezoneChange}"
+              >
+                ${TIMEZONE_GROUPS.map(g => html`
+                  <optgroup label="${g.label}">
+                    ${g.zones.map(z => html`
+                      <option value="${z.value}" ?selected="${z.value === timezone}">
+                        ${z.label}
+                      </option>
+                    `)}
+                  </optgroup>
+                `)}
+              </select>
+              ${CARET}
+            </div>
             ${!TIMEZONE_GROUPS.flatMap(g => g.zones).some(z => z.value === timezone) ? html`
               <div class="hint" role="note">
                 Your timezone (<strong>${timezone}</strong>) is active but not shown in the list above.
