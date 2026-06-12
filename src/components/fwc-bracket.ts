@@ -120,6 +120,14 @@ export class FwcBracket extends LitElement {
       font-weight: 600;
       color: var(--fwc-gold-text);
     }
+    /* Shared kick-off time row — appears once between home and away (#16) */
+    .slot-time-row {
+      justify-content: center;
+      border-top: 1px solid var(--fwc-border-subtle);
+      border-bottom: 1px solid var(--fwc-border-subtle);
+      padding: 3px 0;
+      margin: 1px 0;
+    }
 
     .venue-line {
       font-size: 0.68rem;
@@ -174,11 +182,20 @@ export class FwcBracket extends LitElement {
   render() {
     const rounds = this._rounds;
     const finalMatch = this.matchData.find(m => m.id === 104);
-    const champion = finalMatch?.status === 'completed' && finalMatch.homeScore !== null && finalMatch.awayScore !== null
-      ? finalMatch.homeScore > finalMatch.awayScore
-        ? TEAMS_BY_ID.get(finalMatch.homeId!)
-        : TEAMS_BY_ID.get(finalMatch.awayId!)
-      : null;
+
+    // Determine champion accounting for penalty shootouts (#8)
+    let champion = null;
+    if (finalMatch?.status === 'completed' &&
+        finalMatch.homeScore !== null && finalMatch.awayScore !== null &&
+        finalMatch.homeId && finalMatch.awayId) {
+      const homeWins =
+        finalMatch.homeScore > finalMatch.awayScore ||
+        (finalMatch.homeScore === finalMatch.awayScore &&
+         finalMatch.homePenalty != null &&
+         finalMatch.awayPenalty != null &&
+         finalMatch.homePenalty > finalMatch.awayPenalty);
+      champion = TEAMS_BY_ID.get(homeWins ? finalMatch.homeId : finalMatch.awayId) ?? null;
+    }
 
     return html`
       <div role="region" aria-label="Knockout bracket">
@@ -218,11 +235,26 @@ export class FwcBracket extends LitElement {
     const { timezone, favoriteTeamIds } = this;
     const home = match.homeId ? TEAMS_BY_ID.get(match.homeId) : null;
     const away = match.awayId ? TEAMS_BY_ID.get(match.awayId) : null;
-    const hasScore = match.homeScore !== null && match.awayScore !== null;
+    const hasScore   = match.homeScore !== null && match.awayScore !== null;
+    const isFinished = match.status === 'completed';
     const fmt = formatMatchTime(match.utc, timezone);
 
-    const homeWon = hasScore && match.homeScore! > match.awayScore!;
-    const awayWon = hasScore && match.awayScore! > match.homeScore!;
+    // Correctly handle penalty-decided matches (#8): equal regular-time scores
+    // with penalties set mean the penalty winner should be highlighted.
+    const homeWins = hasScore && (
+      match.homeScore! > match.awayScore! ||
+      (match.homeScore === match.awayScore &&
+       match.homePenalty != null && match.awayPenalty != null &&
+       match.homePenalty > match.awayPenalty)
+    );
+    const awayWins = hasScore && (
+      match.awayScore! > match.homeScore! ||
+      (match.homeScore === match.awayScore &&
+       match.homePenalty != null && match.awayPenalty != null &&
+       match.awayPenalty > match.homePenalty)
+    );
+    const homeWon = isFinished && homeWins;
+    const awayWon = isFinished && awayWins;
 
     const homeIsFav = home && favoriteTeamIds.includes(home.id);
     const awayIsFav = away && favoriteTeamIds.includes(away.id);
@@ -251,9 +283,16 @@ export class FwcBracket extends LitElement {
             </span>
             ${hasScore
               ? html`<span class="team-score ${homeWon ? 'winner' : ''}" aria-label="Score: ${match.homeScore}">${match.homeScore}</span>`
-              : html`<span class="team-time">${fmt.time}</span>`
+              : nothing
             }
           </div>
+
+          <!-- Kick-off time shown once between teams for scheduled matches -->
+          ${!hasScore ? html`
+            <div class="team-row slot-time-row" aria-hidden="true">
+              <span class="team-time">${fmt.time}</span>
+            </div>
+          ` : nothing}
 
           <!-- Away / bottom team -->
           <div class="team-row">
@@ -278,14 +317,15 @@ export class FwcBracket extends LitElement {
 
   private _roundDateRange(matches: Match[]): string {
     if (matches.length === 0) return '';
-    const dates = matches.map(m => {
-      const d = new Date(m.utc);
-      return d;
+    const dates = matches.map(m => new Date(m.utc)).sort((a, b) => a.getTime() - b.getTime());
+    // Use the user's timezone so dates match what they see on the schedule (#11)
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: this.timezone,
+      month: 'short',
+      day: 'numeric',
     });
-    dates.sort((a, b) => a.getTime() - b.getTime());
-    const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
     const first = fmt.format(dates[0]);
-    const last = fmt.format(dates[dates.length - 1]);
+    const last  = fmt.format(dates[dates.length - 1]);
     return first === last ? first : `${first} – ${last}`;
   }
 }
