@@ -121,8 +121,10 @@ export class FwcApp extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 10px;
-      font-size: 0.78rem;
-      color: var(--fwc-text-muted);
+      /* 0.82rem = ~13px: --fwc-text gives 7.5:1 in light, 9.5:1 in dark ✓
+         (--fwc-text-muted at 0.78rem failed dark-mode AA: 4.34:1 < 4.5:1) */
+      font-size: 0.82rem;
+      color: var(--fwc-text);
       border-radius: 12px;
       margin: 16px 4px;
     }
@@ -149,12 +151,15 @@ export class FwcApp extends LitElement {
       height: 6px;
       border-radius: 50%;
       background: var(--fwc-danger);
-      animation: livePip 1.2s ease-in-out infinite;
       flex-shrink: 0;
     }
-    @keyframes livePip {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
+    /* Pulse only when the user has not opted out of motion */
+    @media (prefers-reduced-motion: no-preference) {
+      .live-pip { animation: livePip 1.2s ease-in-out infinite; }
+      @keyframes livePip {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+      }
     }
 
     /* ── Tab nav — coach-board underline style ───────────────── */
@@ -249,24 +254,34 @@ export class FwcApp extends LitElement {
   /** Live match data — static MATCHES overlaid with any fetched scores. */
   @state() private _matches: Match[] = [...MATCHES];
   @state() private _countdown = '';
+  /** Cached next match — set once per tick so _renderCountdown doesn't recompute. */
+  @state() private _nextMatchCache: Match | null = null;
 
-  /** The next upcoming or currently live match relative to now. */
-  private get _nextMatch(): Match | null {
+  /** Find the next live or upcoming match. Uses a 30-min lookback so a
+   *  match that kicked off recently (but hasn't updated to 'live' yet) doesn't
+   *  linger as "0m 00s" for a long time. */
+  private _computeNextMatch(): Match | null {
     const now = Date.now();
     const live = this._matches.find(m => m.status === 'live');
     if (live) return live;
     return this._matches
-      .filter(m => m.status === 'scheduled' && new Date(m.utc).getTime() > now - 60_000 * 120)
+      .filter(m => m.status === 'scheduled' && new Date(m.utc).getTime() > now - 60_000 * 30)
       .sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime())[0] ?? null;
   }
 
   private _tickTimer: ReturnType<typeof setInterval> | null = null;
 
   private _tick(): void {
-    const next = this._nextMatch;
+    const next = this._computeNextMatch();
+    this._nextMatchCache = next;
     if (!next) { this._countdown = ''; return; }
     if (next.status === 'live') { this._countdown = 'live'; return; }
     const secs = Math.max(0, Math.floor((new Date(next.utc).getTime() - Date.now()) / 1000));
+    if (secs === 0) {
+      // Match is at kickoff but not yet flagged live — avoid misleading "0m 00s"
+      this._countdown = 'starting';
+      return;
+    }
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
@@ -286,7 +301,21 @@ export class FwcApp extends LitElement {
   }
 
   private _onVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') this._loadScores();
+    if (document.visibilityState === 'visible') {
+      this._loadScores();
+      // Resume ticking when the tab comes back into focus
+      if (this._tickTimer === null) {
+        this._tick();
+        this._tickTimer = setInterval(() => this._tick(), 1000);
+      }
+    } else {
+      // Pause the interval while the tab is hidden — browsers throttle it
+      // anyway, but pausing explicitly avoids any accumulated lag on resume
+      if (this._tickTimer !== null) {
+        clearInterval(this._tickTimer);
+        this._tickTimer = null;
+      }
+    }
   };
 
   override connectedCallback(): void {
@@ -325,23 +354,37 @@ export class FwcApp extends LitElement {
   }
 
   private _renderCountdown() {
-    const next = this._nextMatch;
+    const next = this._nextMatchCache;
     if (!next || !this._countdown) return nothing;
 
-    const isLive = this._countdown === 'live';
+    const isLive     = this._countdown === 'live';
+    const isStarting = this._countdown === 'starting';
     const homeTeam = next.homeId ? TEAMS_BY_ID.get(next.homeId) : null;
     const awayTeam = next.awayId ? TEAMS_BY_ID.get(next.awayId) : null;
     const homeLabel = homeTeam?.shortName ?? next.homeLabel ?? 'TBD';
     const awayLabel = awayTeam?.shortName ?? next.awayLabel ?? 'TBD';
-    const matchLabel = `${homeLabel} vs ${awayLabel}`;
+    // "versus" in aria-label; "vs" in visible text (screen readers pronounce "vs" literally)
+    const matchVisual = `${homeLabel} vs ${awayLabel}`;
+    const matchAria   = `${homeLabel} versus ${awayLabel}`;
 
     if (isLive) {
       return html`
-        <div class="countdown-strip live-now" role="status" aria-live="polite"
-             aria-label="${matchLabel} is live now">
+        <div class="countdown-strip live-now" role="status"
+             aria-label="${matchAria} is live now">
           <span class="live-pip" aria-hidden="true"></span>
-          <span class="countdown-match live-now">${matchLabel}</span>
+          <span class="countdown-match live-now">${matchVisual}</span>
           <span class="countdown-label">is live now</span>
+        </div>
+      `;
+    }
+
+    if (isStarting) {
+      return html`
+        <div class="countdown-strip live-now" role="status"
+             aria-label="${matchAria} is starting now">
+          <span class="live-pip" aria-hidden="true"></span>
+          <span class="countdown-match live-now">${matchVisual}</span>
+          <span class="countdown-label">starting now</span>
         </div>
       `;
     }
@@ -349,10 +392,10 @@ export class FwcApp extends LitElement {
     const fmt = formatMatchTime(next.utc, this._prefs.timezone);
     return html`
       <div class="countdown-strip" role="timer"
-           aria-label="${this._countdown} until ${matchLabel}">
+           aria-label="Countdown to next match">
         <span class="countdown-label">Next match in</span>
         <span class="countdown-time">${this._countdown}</span>
-        <span class="countdown-match">${matchLabel}</span>
+        <span class="countdown-match">${matchVisual}</span>
         <span class="countdown-label">${fmt.dateShort} · ${fmt.time}</span>
       </div>
     `;
