@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings, GROUP_COLORS } from '../lib/data.js';
 import type { Match, GroupStanding } from '../lib/types.js';
+import type { GroupLetter } from '../lib/data.js';
 
 @customElement('fwc-standings')
 export class FwcStandings extends LitElement {
@@ -106,13 +107,19 @@ export class FwcStandings extends LitElement {
       align-items: center;
       gap: 5px;
     }
-    /* pos-indicator uses a thin sliver of the group hue — set inline */
+    /* pos-indicator: a colored tile with a symbol marker so advancement
+     * status is conveyed by shape/text AND color (WCAG 1.4.1). */
     .pos-indicator {
-      width: 3px;
-      height: 18px;
-      border-radius: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
       flex-shrink: 0;
-      opacity: 0.6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 900;
+      line-height: 1;
     }
 
     .team-flag {
@@ -147,9 +154,13 @@ export class FwcStandings extends LitElement {
 
   private _renderGroup(group: string) {
     const standings: GroupStanding[] = computeStandings(group, this.matchData);
-    const gc = GROUP_COLORS[group];
+    const gc = GROUP_COLORS[group as GroupLetter];
     const hdrStyle = `background:${gc.hdr};color:${gc.text};`;
-    const letterStyle = `background:rgba(0,0,0,0.15);color:${gc.text};`;
+    const letterStyle = `background:rgba(0,0,0,0.12);color:${gc.text};`;
+
+    // Pos markers: convey advancement by symbol AND color (WCAG 1.4.1)
+    // ↑ = top-2, advances to Round of 32; ≈ = 3rd, possible advance
+    const MARKER: Record<number, string> = { 1: '↑', 2: '↑', 3: '≈' };
 
     return html`
       <div class="group-card">
@@ -171,25 +182,37 @@ export class FwcStandings extends LitElement {
           </thead>
           <tbody>
             ${standings.map((s, i) => {
-              const pos = i + 1;
+              const pos  = i + 1;
               const team = TEAMS_BY_ID.get(s.teamId);
               const isFav = this.favoriteTeamIds.includes(s.teamId);
               const gdStr = s.gd > 0 ? `+${s.gd}` : `${s.gd}`;
-              // Top 2 get a subtle group-tinted background; pos 3 gets half that
-              const rowBg = pos <= 2 ? gc.tint
-                           : pos === 3 ? gc.tint.replace('0.09', '0.05').replace('0.10', '0.05')
-                           : '';
+
+              // Use explicit tint / tint3 properties — no fragile string-replace
+              const rowBg = pos <= 2 ? gc.tint : pos === 3 ? gc.tint3 : '';
               const rowStyle = rowBg ? `background:${rowBg};` : '';
+
+              // Advancement note in aria-label satisfies WCAG 1.4.1 (non-color indicator)
+              const advNote = pos <= 2 ? ', advances to knockout round'
+                            : pos === 3 ? ', possible third-place advance'
+                            : '';
+
+              const marker = MARKER[pos] ?? '';
+              // Marker background matches the group header color; text from gc.text
+              const markerStyle = marker
+                ? `background:${gc.hdr};color:${gc.text};`
+                : 'background:transparent;';
 
               return html`
                 <tr
                   class="${isFav ? 'favorite-row' : ''}"
                   style="${rowStyle}"
-                  aria-label="${team?.name ?? s.teamId}: ${s.points} points, played ${s.played}"
+                  aria-label="${team?.name ?? s.teamId}: ${s.points} points, played ${s.played}${advNote}"
                 >
-                  <td class="team-col pos-${pos}">
+                  <td class="team-col">
                     <div class="team-cell">
-                      <div class="pos-indicator" style="background:${gc.hdr};" aria-hidden="true"></div>
+                      <div class="pos-indicator" style="${markerStyle}" aria-hidden="true">
+                        ${marker}
+                      </div>
                       <span class="team-flag" role="img" aria-label="${team?.name ?? ''} flag">
                         ${team?.flag ?? '🏳'}
                       </span>
