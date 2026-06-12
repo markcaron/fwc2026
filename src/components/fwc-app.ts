@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { loadPreferences, updatePreferences } from '../lib/storage.js';
 import { formatMatchTime } from '../lib/time.js';
-import { MATCHES } from '../lib/data.js';
+import { MATCHES, TEAMS_BY_ID } from '../lib/data.js';
 import { fetchScores, applyScores } from '../lib/scores.js';
 import { SCORES_URL } from '../lib/config.js';
 import type { Match, StoredPreferences, TabId } from '../lib/types.js';
@@ -112,6 +112,54 @@ export class FwcApp extends LitElement {
       flex-shrink: 0;
     }
 
+    /* ── Countdown strip ─────────────────────────────────────── */
+    /*
+     * Sits between the header and the tab bar. Shows time remaining until
+     * the next scheduled (or live) match. Hides itself when there's no
+     * upcoming match (tournament over) or during a live match.
+     */
+    .countdown-strip {
+      background: var(--fwc-bg-surface);
+      border-bottom: 1px solid var(--fwc-border-subtle);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.78rem;
+      color: var(--fwc-text-muted);
+    }
+    .countdown-strip.live-now {
+      background: color-mix(in srgb, var(--fwc-danger) 8%, transparent);
+      color: var(--fwc-danger-text);
+    }
+    .countdown-label { font-weight: 400; }
+    .countdown-match {
+      font-weight: 600;
+      color: var(--fwc-text);
+    }
+    .countdown-match.live-now { color: var(--fwc-danger-text); }
+    .countdown-time {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: var(--fwc-text);
+      min-width: 48px;
+      text-align: center;
+    }
+    .live-pip {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fwc-danger);
+      animation: livePip 1.2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes livePip {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
     /* ── Tab nav — coach-board underline style ───────────────── */
     /*
      * Moved from the bottom to just below the floating header.
@@ -203,6 +251,32 @@ export class FwcApp extends LitElement {
   @state() private _activeTab: TabId = 'schedule';
   /** Live match data — static MATCHES overlaid with any fetched scores. */
   @state() private _matches: Match[] = [...MATCHES];
+  @state() private _countdown = '';
+
+  /** The next upcoming or currently live match relative to now. */
+  private get _nextMatch(): Match | null {
+    const now = Date.now();
+    const live = this._matches.find(m => m.status === 'live');
+    if (live) return live;
+    return this._matches
+      .filter(m => m.status === 'scheduled' && new Date(m.utc).getTime() > now - 60_000 * 120)
+      .sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime())[0] ?? null;
+  }
+
+  private _tickTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _tick(): void {
+    const next = this._nextMatch;
+    if (!next) { this._countdown = ''; return; }
+    if (next.status === 'live') { this._countdown = 'live'; return; }
+    const secs = Math.max(0, Math.floor((new Date(next.utc).getTime() - Date.now()) / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    this._countdown = h > 0
+      ? `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`
+      : `${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+  }
 
   private get _todayLabel(): string {
     return formatMatchTime(new Date().toISOString(), this._prefs.timezone).dateShort;
@@ -222,11 +296,14 @@ export class FwcApp extends LitElement {
     super.connectedCallback();
     this._loadScores();
     document.addEventListener('visibilitychange', this._onVisibilityChange);
+    this._tick();
+    this._tickTimer = setInterval(() => this._tick(), 1000);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
+    if (this._tickTimer !== null) clearInterval(this._tickTimer);
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -250,6 +327,40 @@ export class FwcApp extends LitElement {
     this.shadowRoot?.querySelector<HTMLButtonElement>(`#tab-${tabs[next]}`)?.focus();
   }
 
+  private _renderCountdown() {
+    const next = this._nextMatch;
+    if (!next || !this._countdown) return nothing;
+
+    const isLive = this._countdown === 'live';
+    const homeTeam = next.homeId ? TEAMS_BY_ID.get(next.homeId) : null;
+    const awayTeam = next.awayId ? TEAMS_BY_ID.get(next.awayId) : null;
+    const homeLabel = homeTeam?.shortName ?? next.homeLabel ?? 'TBD';
+    const awayLabel = awayTeam?.shortName ?? next.awayLabel ?? 'TBD';
+    const matchLabel = `${homeLabel} vs ${awayLabel}`;
+
+    if (isLive) {
+      return html`
+        <div class="countdown-strip live-now" role="status" aria-live="polite"
+             aria-label="${matchLabel} is live now">
+          <span class="live-pip" aria-hidden="true"></span>
+          <span class="countdown-match live-now">${matchLabel}</span>
+          <span class="countdown-label">is live now</span>
+        </div>
+      `;
+    }
+
+    const fmt = formatMatchTime(next.utc, this._prefs.timezone);
+    return html`
+      <div class="countdown-strip" role="timer"
+           aria-label="${this._countdown} until ${matchLabel}">
+        <span class="countdown-label">Next match in</span>
+        <span class="countdown-time">${this._countdown}</span>
+        <span class="countdown-match">${matchLabel}</span>
+        <span class="countdown-label">${fmt.dateShort} · ${fmt.time}</span>
+      </div>
+    `;
+  }
+
   render() {
     const { _prefs: prefs, _activeTab: active, _matches: matches } = this;
 
@@ -268,6 +379,9 @@ export class FwcApp extends LitElement {
           </span>
         </div>
       </header>
+
+      <!-- Countdown / live strip — between header and tab bar -->
+      ${this._renderCountdown()}
 
       <!-- Tab bar below the floating header -->
       <nav class="tab-bar" role="navigation" aria-label="Main navigation">
