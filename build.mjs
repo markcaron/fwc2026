@@ -16,6 +16,7 @@
 
 import { build } from 'esbuild';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import sharp from 'sharp';
 
 // ── Clean and scaffold output dir ────────────────────────────
@@ -62,5 +63,19 @@ html = html.replace(
 );
 fs.writeFileSync('dist/index.html', html);
 console.log('✓ Patched index.html → dist/index.html');
+
+// ── 5. Service worker — inject content hash as cache version ─────
+// The hash changes whenever bundle.js changes, so the browser always
+// downloads a new SW file on deploy and triggers the auto-refresh flow.
+const bundleHash = crypto
+  .createHash('sha256')
+  .update(fs.readFileSync('dist/bundle.js'))
+  .digest('hex')
+  .slice(0, 12);
+
+const sw = fs.readFileSync('public/sw.js', 'utf8')
+  .replace('__CACHE_VERSION__', bundleHash);
+fs.writeFileSync('dist/sw.js', sw);
+console.log(`✓ Service worker → dist/sw.js  (cache version: ${bundleHash})`);
 
 console.log('\nBuild complete → dist/');

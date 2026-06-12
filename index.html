@@ -11,6 +11,7 @@
     <title>WC 2026 — Schedule &amp; Standings</title>
     <link rel="icon" type="image/svg+xml" href="/public/favicon.svg" />
     <link rel="apple-touch-icon" href="/public/apple-touch-icon.png" />
+    <link rel="manifest" href="/public/manifest.json" />
     <link rel="stylesheet" href="/src/tokens.css" />
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,5 +37,32 @@
   <body>
     <fwc-app></fwc-app>
     <script type="module" src="/src/index.ts"></script>
+    <script>
+      /**
+       * Service Worker registration + auto-refresh on update.
+       *
+       * How it works:
+       * 1. Browser fetches /sw.js. If it's byte-different from the cached
+       *    version (it will be — build.mjs injects a new hash each deploy),
+       *    it installs the new SW.
+       * 2. The SW calls skipWaiting(), so it activates immediately instead
+       *    of waiting for all tabs using the old version to close.
+       * 3. skipWaiting() fires the 'controllerchange' event on this page.
+       * 4. This listener catches it and reloads — users get the new build
+       *    within seconds of a deploy, with no manual refresh needed.
+       */
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            // SW registration failed (e.g. in dev). Silently ignore.
+          });
+        });
+
+        // Reload when a new SW takes control
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      }
+    </script>
   </body>
 </html>
