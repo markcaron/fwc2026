@@ -132,7 +132,6 @@ export class FwcStandings extends LitElement {
       max-width: 80px;
     }
     /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
-    /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .team-name.favorite { color: var(--fwc-gold-text); }
 
     /* Legend at the bottom — SVG markers use currentColor so they follow
