@@ -231,8 +231,8 @@ export class FwcSchedule extends LitElement {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      min-width: 36px;
+      min-height: 36px;
       background: none;
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
@@ -250,15 +250,19 @@ export class FwcSchedule extends LitElement {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-btn svg { width: 14px; height: 14px; }
-    /* Hidden input — only used to access the native date picker via showPicker() */
+    .date-pick-btn svg { width: 18px; height: 18px; }
+    /*
+     * Hidden input is anchored at the BOTTOM of the wrapper so the browser
+     * positions the native date picker popup below the button, not over it.
+     */
     .date-input-hidden {
       position: absolute;
-      width: 0;
-      height: 0;
+      top: 100%;
+      left: 0;
+      width: 1px;
+      height: 1px;
       opacity: 0;
       pointer-events: none;
-      inset: 0;
     }
 
     /*
@@ -555,9 +559,6 @@ export class FwcSchedule extends LitElement {
                       ${isToday && showTodayPill
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
-                      <span class="count-label">
-                        ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
-                      </span>
                       ${isSingleDay ? html`
                         <div class="date-pick-wrap">
                           <button
@@ -589,6 +590,9 @@ export class FwcSchedule extends LitElement {
                           />
                         </div>
                       ` : nothing}
+                      <span class="count-label">
+                        ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
+                      </span>
                     </div>
 
                     ${isSingleDay ? html`
