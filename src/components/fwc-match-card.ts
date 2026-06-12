@@ -115,12 +115,18 @@ export class FwcMatchCard extends LitElement {
       color: var(--fwc-gold-text);
     }
 
-    /* "Final" shown below the score for completed matches */
+    /* "Final" pill shown below the score for completed matches */
     .status-final {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      background: var(--fwc-bg-surface);
+      border: 1px solid var(--fwc-border);
+      border-radius: 20px;
       font-size: 0.68rem;
-      font-weight: 600;
-      color: var(--fwc-text-subtle);
-      letter-spacing: 0.03em;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+      margin-top: 2px;
     }
 
     /* Pulsing dot + "Live" shown in the score area when match is in-progress
