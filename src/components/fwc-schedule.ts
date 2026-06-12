@@ -531,27 +531,38 @@ export class FwcSchedule extends LitElement {
     const { type, value } = this._filter;
     const tz = this.timezone;
     const dateOf = (m: Match) => getLocalDateString(m.utc, tz);
+    const byKickOff = (a: Match, b: Match) =>
+      new Date(a.utc).getTime() - new Date(b.utc).getTime();
+    let results: Match[];
     switch (type) {
       case 'search':
-        return this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        results = this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        break;
       case 'today':
-        return this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        results = this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        break;
       case 'date':
-        return this.matchData.filter(m => dateOf(m) === value);
+        results = this.matchData.filter(m => dateOf(m) === value);
+        break;
       case 'favorites':
-        return this.matchData.filter(m =>
+        results = this.matchData.filter(m =>
           (m.homeId && this.favoriteTeamIds.includes(m.homeId)) ||
           (m.awayId && this.favoriteTeamIds.includes(m.awayId))
         );
+        break;
       case 'group':
-        return this.matchData.filter(m => m.round === 'group' && m.group === value);
+        results = this.matchData.filter(m => m.round === 'group' && m.group === value);
+        break;
       case 'team':
-        return this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        results = this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        break;
       case 'round':
-        return this.matchData.filter(m => m.round === value);
+        results = this.matchData.filter(m => m.round === value);
+        break;
       default:
-        return [...this.matchData];
+        results = [...this.matchData];
     }
+    return results.sort(byKickOff);
   }
 
   private _set(filter: ScheduleFilter) {
