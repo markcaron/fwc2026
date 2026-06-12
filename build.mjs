@@ -16,6 +16,7 @@
 
 import { build } from 'esbuild';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import sharp from 'sharp';
 
 // ── Clean and scaffold output dir ────────────────────────────
@@ -47,12 +48,24 @@ console.log('✓ Copied public/');
 // We render the same SVG used for the browser favicon.
 await sharp(
   Buffer.from(fs.readFileSync('public/favicon.svg', 'utf8')),
-  { density: 72 }           // 72 dpi → crisp render at 180×180 px
+  { density: 72 }
 )
   .resize(180, 180)
   .png()
   .toFile('dist/public/apple-touch-icon.png');
 console.log('✓ Generated apple-touch-icon.png (180×180)');
+
+// Generate PWA install icons (required for Android Add to Home Screen prompt)
+for (const size of [192, 512]) {
+  await sharp(
+    Buffer.from(fs.readFileSync('public/favicon.svg', 'utf8')),
+    { density: 72 }
+  )
+    .resize(size, size)
+    .png()
+    .toFile(`dist/public/icon-${size}.png`);
+  console.log(`✓ Generated icon-${size}.png`);
+}
 
 // ── 4. Patch index.html ──────────────────────────────────────
 let html = fs.readFileSync('index.html', 'utf8');
@@ -62,5 +75,19 @@ html = html.replace(
 );
 fs.writeFileSync('dist/index.html', html);
 console.log('✓ Patched index.html → dist/index.html');
+
+// ── 5. Service worker — inject content hash as cache version ─────
+// The hash changes whenever bundle.js changes, so the browser always
+// downloads a new SW file on deploy and triggers the auto-refresh flow.
+const bundleHash = crypto
+  .createHash('sha256')
+  .update(fs.readFileSync('dist/bundle.js'))
+  .digest('hex')
+  .slice(0, 12);
+
+const sw = fs.readFileSync('public/sw.js', 'utf8')
+  .replace('__CACHE_VERSION__', bundleHash);
+fs.writeFileSync('dist/sw.js', sw);
+console.log(`✓ Service worker → dist/sw.js  (cache version: ${bundleHash})`);
 
 console.log('\nBuild complete → dist/');

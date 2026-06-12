@@ -31,3 +31,19 @@
   for = "/src/tokens.css"
   [headers.values]
     Cache-Control = "public, max-age=86400"
+
+# Service worker must never be cached by the browser — it needs to be
+# re-fetched on every visit so the browser can detect new versions.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    # no-cache (not no-store): allows conditional requests (304/ETags) so the
+    # browser re-validates on every load without always downloading a full copy.
+    # The SW must be re-fetched on each visit to detect new versions.
+    Cache-Control = "no-cache"
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/public/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
