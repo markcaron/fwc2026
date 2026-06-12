@@ -4,15 +4,8 @@ import { MATCHES, TEAMS, GROUPS, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
 import { ROUND_LABELS } from '../lib/types.js';
+import { CARET } from '../lib/icons.js';
 import './fwc-match-card.js';
-
-/** Down-chevron reused in every select chip */
-const CARET = html`
-  <svg class="chip-caret" viewBox="0 0 10 6" fill="none" aria-hidden="true" focusable="false">
-    <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-`;
 
 @customElement('fwc-schedule')
 export class FwcSchedule extends LitElement {
@@ -531,27 +524,38 @@ export class FwcSchedule extends LitElement {
     const { type, value } = this._filter;
     const tz = this.timezone;
     const dateOf = (m: Match) => getLocalDateString(m.utc, tz);
+    const byKickOff = (a: Match, b: Match) =>
+      new Date(a.utc).getTime() - new Date(b.utc).getTime();
+    let results: Match[];
     switch (type) {
       case 'search':
-        return this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        results = this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        break;
       case 'today':
-        return this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        results = this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        break;
       case 'date':
-        return this.matchData.filter(m => dateOf(m) === value);
+        results = this.matchData.filter(m => dateOf(m) === value);
+        break;
       case 'favorites':
-        return this.matchData.filter(m =>
+        results = this.matchData.filter(m =>
           (m.homeId && this.favoriteTeamIds.includes(m.homeId)) ||
           (m.awayId && this.favoriteTeamIds.includes(m.awayId))
         );
+        break;
       case 'group':
-        return this.matchData.filter(m => m.round === 'group' && m.group === value);
+        results = this.matchData.filter(m => m.round === 'group' && m.group === value);
+        break;
       case 'team':
-        return this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        results = this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        break;
       case 'round':
-        return this.matchData.filter(m => m.round === value);
+        results = this.matchData.filter(m => m.round === value);
+        break;
       default:
-        return [...this.matchData];
+        results = [...this.matchData];
     }
+    return results.sort(byKickOff);
   }
 
   private _set(filter: ScheduleFilter) {
