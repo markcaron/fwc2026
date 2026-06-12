@@ -37,7 +37,10 @@
 [[headers]]
   for = "/sw.js"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    # no-cache (not no-store): allows conditional requests (304/ETags) so the
+    # browser re-validates on every load without always downloading a full copy.
+    # The SW must be re-fetched on each visit to detect new versions.
+    Cache-Control = "no-cache"
     Content-Type = "application/javascript"
 
 [[headers]]

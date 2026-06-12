@@ -51,15 +51,19 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never intercept live-data endpoints or non-GET requests
-  if (request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
+  // Never intercept live-data endpoints, non-GET requests, or cross-origin requests
+  if (
+    request.method !== 'GET'
+    || url.origin !== self.location.origin   // cross-origin guard (prevents cache pollution)
+    || url.pathname.startsWith('/api/')
+  ) return;
 
   event.respondWith(
     caches.match(request).then((cached) => {
       // Always fetch in the background to keep the cache warm
       const network = fetch(request)
         .then((res) => {
-          if (res.ok && res.status < 400) {
+          if (res.ok) {                      // res.ok is 200-299; status<400 is redundant
             const clone = res.clone();
             caches.open(CACHE).then((c) => c.put(request, clone));
           }

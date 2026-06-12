@@ -45,22 +45,29 @@
        * 1. Browser fetches /sw.js. If it's byte-different from the cached
        *    version (it will be — build.mjs injects a new hash each deploy),
        *    it installs the new SW.
-       * 2. The SW calls skipWaiting(), so it activates immediately instead
-       *    of waiting for all tabs using the old version to close.
-       * 3. skipWaiting() fires the 'controllerchange' event on this page.
-       * 4. This listener catches it and reloads — users get the new build
-       *    within seconds of a deploy, with no manual refresh needed.
+       * 2. The new SW calls skipWaiting() so it advances past the waiting
+       *    phase immediately (no need to close other tabs).
+       * 3. clients.claim() in the activate handler takes control of all open
+       *    clients — this is what fires 'controllerchange' on this page.
+       * 4. We check previousController: if this is a brand-new visitor
+       *    (no previous SW controller), we skip the reload — without this
+       *    guard every first-time visitor would get a spurious reload.
+       * 5. refreshing flag prevents a double-reload edge case.
        */
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {
-            // SW registration failed (e.g. in dev). Silently ignore.
-          });
+      if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+        const previousController = navigator.serviceWorker.controller;
+        let refreshing = false;
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!previousController || refreshing) return;
+          refreshing = true;
+          window.location.reload();
         });
 
-        // Reload when a new SW takes control
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            // SW registration failed (e.g. browser restrictions). Silently ignore.
+          });
         });
       }
     </script>

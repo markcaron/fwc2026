@@ -48,12 +48,24 @@ console.log('✓ Copied public/');
 // We render the same SVG used for the browser favicon.
 await sharp(
   Buffer.from(fs.readFileSync('public/favicon.svg', 'utf8')),
-  { density: 72 }           // 72 dpi → crisp render at 180×180 px
+  { density: 72 }
 )
   .resize(180, 180)
   .png()
   .toFile('dist/public/apple-touch-icon.png');
 console.log('✓ Generated apple-touch-icon.png (180×180)');
+
+// Generate PWA install icons (required for Android Add to Home Screen prompt)
+for (const size of [192, 512]) {
+  await sharp(
+    Buffer.from(fs.readFileSync('public/favicon.svg', 'utf8')),
+    { density: 72 }
+  )
+    .resize(size, size)
+    .png()
+    .toFile(`dist/public/icon-${size}.png`);
+  console.log(`✓ Generated icon-${size}.png`);
+}
 
 // ── 4. Patch index.html ──────────────────────────────────────
 let html = fs.readFileSync('index.html', 'utf8');
