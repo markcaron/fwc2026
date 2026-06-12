@@ -74,19 +74,8 @@ export class FwcStandings extends LitElement {
       transition: background 0.1s;
     }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--fwc-bg-overlay); }
-
-    /* Position row coloring */
-    tbody tr.pos-1,
-    tbody tr.pos-2 {
-      background: var(--fwc-qualified-bg);
-    }
-    tbody tr.pos-3 {
-      background: var(--fwc-playoff-bg);
-    }
-    tbody tr.pos-1:hover,
-    tbody tr.pos-2:hover { background: var(--fwc-qualified-bg); }
-    tbody tr.pos-3:hover  { background: var(--fwc-playoff-bg); }
+    /* row tint set inline per group — no global pos-1/pos-2/pos-3 overrides needed */
+    tbody tr:hover { filter: brightness(0.97); }
 
     /* highlight-ring: navy-500 in light (6.1:1 on white ✓), gold in dark */
     tbody tr.favorite-row {
@@ -117,16 +106,14 @@ export class FwcStandings extends LitElement {
       align-items: center;
       gap: 5px;
     }
+    /* pos-indicator uses a thin sliver of the group hue — set inline */
     .pos-indicator {
-      width: 4px;
-      height: 20px;
+      width: 3px;
+      height: 18px;
       border-radius: 2px;
       flex-shrink: 0;
+      opacity: 0.6;
     }
-    .pos-1 .pos-indicator,
-    .pos-2 .pos-indicator { background: var(--fwc-qualified); }
-    .pos-3 .pos-indicator { background: var(--fwc-playoff); }
-    .pos-4 .pos-indicator { background: transparent; }
 
     .team-flag {
       font-size: 1rem;
@@ -143,27 +130,6 @@ export class FwcStandings extends LitElement {
     }
     /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .team-name.favorite { color: var(--fwc-gold-text); }
-
-    .legend {
-      margin-top: 10px;
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 0.7rem;
-      color: var(--fwc-text-subtle);
-    }
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-    }
-    .legend-dot.qualified { background: var(--fwc-qualified); }
-    .legend-dot.playoff   { background: var(--fwc-playoff); }
   `;
 
   @property({ type: Array }) matchData: Match[] = [...MATCHES];
@@ -175,16 +141,6 @@ export class FwcStandings extends LitElement {
         <div class="groups-grid">
           ${GROUPS.map(g => this._renderGroup(g))}
         </div>
-        <div class="legend" role="note" aria-label="Table legend">
-          <div class="legend-item">
-            <div class="legend-dot qualified" aria-hidden="true"></div>
-            <span>Advance (top 2)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot playoff" aria-hidden="true"></div>
-            <span>Possible 3rd-place advance</span>
-          </div>
-        </div>
       </div>
     `;
   }
@@ -192,15 +148,12 @@ export class FwcStandings extends LitElement {
   private _renderGroup(group: string) {
     const standings: GroupStanding[] = computeStandings(group, this.matchData);
     const gc = GROUP_COLORS[group];
-    // CSS color-scheme-aware background & text applied inline so they pick up
-    // light/dark values without needing a Shadow DOM custom property.
-    const headerBg   = `light-dark(${gc.light}, ${gc.dark})`;
-    const letterStyle = `background:${headerBg};color:${gc.text};`;
-    const headerStyle = `background:${headerBg};`;
+    const hdrStyle = `background:${gc.hdr};color:${gc.text};`;
+    const letterStyle = `background:rgba(0,0,0,0.15);color:${gc.text};`;
 
     return html`
       <div class="group-card">
-        <div class="group-header" style="${headerStyle}">
+        <div class="group-header" style="${hdrStyle}">
           <div class="group-letter" style="${letterStyle}" aria-hidden="true">${group}</div>
           <span>Group ${group}</span>
         </div>
@@ -222,15 +175,21 @@ export class FwcStandings extends LitElement {
               const team = TEAMS_BY_ID.get(s.teamId);
               const isFav = this.favoriteTeamIds.includes(s.teamId);
               const gdStr = s.gd > 0 ? `+${s.gd}` : `${s.gd}`;
+              // Top 2 get a subtle group-tinted background; pos 3 gets half that
+              const rowBg = pos <= 2 ? gc.tint
+                           : pos === 3 ? gc.tint.replace('0.09', '0.05').replace('0.10', '0.05')
+                           : '';
+              const rowStyle = rowBg ? `background:${rowBg};` : '';
 
               return html`
                 <tr
-                  class="pos-${pos} ${isFav ? 'favorite-row' : ''}"
+                  class="${isFav ? 'favorite-row' : ''}"
+                  style="${rowStyle}"
                   aria-label="${team?.name ?? s.teamId}: ${s.points} points, played ${s.played}"
                 >
                   <td class="team-col pos-${pos}">
                     <div class="team-cell">
-                      <div class="pos-indicator" aria-hidden="true"></div>
+                      <div class="pos-indicator" style="background:${gc.hdr};" aria-hidden="true"></div>
                       <span class="team-flag" role="img" aria-label="${team?.name ?? ''} flag">
                         ${team?.flag ?? '🏳'}
                       </span>

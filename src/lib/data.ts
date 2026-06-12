@@ -2,22 +2,23 @@ import type { Team, Match, GroupStanding } from './types.js';
 
 // ============================================================
 // Group color palette — 12 distinct hues, A through L.
-// Each entry: [bg (light mode), bg (dark mode), text (both modes)]
-// All text values are verified ≥ 4.5:1 contrast on their bg.
+// hdr: header background (solid, vivid)
+// text: header text (white or dark based on contrast)
+// tint: very subtle row tint for table rows (replaces green/amber qualified highlight)
 // ============================================================
-export const GROUP_COLORS: Record<string, { light: string; dark: string; text: string }> = {
-  A: { light: '#fde8e8', dark: 'rgba(220,53,53,0.18)',  text: '#b91c1c' },
-  B: { light: '#fff3e0', dark: 'rgba(234,126,0,0.18)',  text: '#c45d00' },
-  C: { light: '#fefce8', dark: 'rgba(202,183,0,0.18)',  text: '#836b00' },
-  D: { light: '#e8faf0', dark: 'rgba(22,163,74,0.18)',  text: '#166534' },
-  E: { light: '#e0f7f4', dark: 'rgba(20,184,166,0.18)', text: '#0f766e' },
-  F: { light: '#e0f2fe', dark: 'rgba(14,165,233,0.18)', text: '#075985' },
-  G: { light: '#ede9fe', dark: 'rgba(124,58,237,0.18)', text: '#5b21b6' },
-  H: { light: '#fce7f3', dark: 'rgba(219,39,119,0.18)', text: '#9d174d' },
-  I: { light: '#fff1f2', dark: 'rgba(244,63,94,0.18)',  text: '#be123c' },
-  J: { light: '#f0fdf4', dark: 'rgba(74,222,128,0.2)',  text: '#15803d' },
-  K: { light: '#faf5ff', dark: 'rgba(168,85,247,0.18)', text: '#7e22ce' },
-  L: { light: '#fff7ed', dark: 'rgba(249,115,22,0.18)', text: '#c2410c' },
+export const GROUP_COLORS: Record<string, { hdr: string; text: string; tint: string }> = {
+  A: { hdr: '#ef4444', text: '#ffffff', tint: 'rgba(239,68,68,0.09)'   },  // red
+  B: { hdr: '#f97316', text: '#ffffff', tint: 'rgba(249,115,22,0.09)'  },  // orange
+  C: { hdr: '#eab308', text: '#1a1a1a', tint: 'rgba(234,179,8,0.10)'   },  // yellow — dark text
+  D: { hdr: '#84cc16', text: '#1a1a1a', tint: 'rgba(132,204,22,0.10)'  },  // lime — dark text
+  E: { hdr: '#22c55e', text: '#ffffff', tint: 'rgba(34,197,94,0.09)'   },  // green
+  F: { hdr: '#06b6d4', text: '#1a1a1a', tint: 'rgba(6,182,212,0.09)'   },  // cyan — dark text
+  G: { hdr: '#38bdf8', text: '#1a1a1a', tint: 'rgba(56,189,248,0.09)'  },  // sky — dark text
+  H: { hdr: '#6366f1', text: '#ffffff', tint: 'rgba(99,102,241,0.09)'  },  // indigo
+  I: { hdr: '#a855f7', text: '#ffffff', tint: 'rgba(168,85,247,0.09)'  },  // purple
+  J: { hdr: '#d946ef', text: '#ffffff', tint: 'rgba(217,70,239,0.09)'  },  // fuchsia
+  K: { hdr: '#f43f5e', text: '#ffffff', tint: 'rgba(244,63,94,0.09)'   },  // rose
+  L: { hdr: '#ec4899', text: '#ffffff', tint: 'rgba(236,72,153,0.09)'  },  // pink
 };
 
 // ============================================================

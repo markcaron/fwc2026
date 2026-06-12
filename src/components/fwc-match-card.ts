@@ -221,7 +221,7 @@ export class FwcMatchCard extends LitElement {
           ${metaLabel ? (() => {
               const gc = match.group ? GROUP_COLORS[match.group] : null;
               const style = gc
-                ? `background:light-dark(${gc.light},${gc.dark});color:${gc.text};border-color:transparent;`
+                ? `background:${gc.hdr};color:${gc.text};border-color:transparent;`
                 : '';
               return html`<span class="badge" style="${style}">${metaLabel}</span>`;
             })() : nothing}
