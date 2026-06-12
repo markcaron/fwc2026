@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { MATCHES, TEAMS, GROUPS } from '../lib/data.js';
+import { MATCHES, TEAMS, GROUPS, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
 import { ROUND_LABELS } from '../lib/types.js';
@@ -46,6 +46,69 @@ export class FwcSchedule extends LitElement {
       background: var(--fwc-border-subtle);
       margin: 0 12px;
     }
+
+    /* ── Search input ───────────────────────────────────────── */
+    .search-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex: 1;               /* expands to fill available width in the row */
+      min-width: 120px;
+      max-width: 280px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      width: 14px;
+      height: 14px;
+      color: var(--fwc-text-muted);
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+    .search-input {
+      width: 100%;
+      min-height: 36px;
+      padding: 0 32px 0 30px;  /* left: icon, right: clear btn */
+      background: var(--fwc-bg-primary);
+      border: 1px solid var(--fwc-border);
+      border-radius: 20px;
+      color: var(--fwc-text);
+      font-size: 0.78rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .search-input::placeholder { color: var(--fwc-text-muted); }
+    .search-input:focus-visible {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+      border-color: var(--fwc-accent);
+    }
+    /* Active — has a query */
+    .search-input:not(:placeholder-shown) {
+      border-color: var(--fwc-accent);
+    }
+    .search-clear {
+      position: absolute;
+      right: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--fwc-bg-surface);
+      border: none;
+      border-radius: 50%;
+      color: var(--fwc-text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s;
+    }
+    .search-clear:hover { background: var(--fwc-border); color: var(--fwc-text); }
+    .search-clear:focus-visible {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+    .search-clear svg { width: 10px; height: 10px; }
 
     /* ── Toggle buttons ─────────────────────────────────────── */
     .filter-btn {
@@ -355,6 +418,27 @@ export class FwcSchedule extends LitElement {
     return this.matchData.reduce((a, b) => a.utc > b.utc ? a : b).utc.slice(0, 10);
   }
 
+  /** Current search query — drives the 'search' filter type. */
+  @state() private _searchQuery = '';
+
+  @query('.search-input') private _searchEl?: HTMLInputElement;
+
+  // ── Fuzzy match helper ─────────────────────────────────────
+  private _matchesSearch(query: string, m: Match): boolean {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    const check = (str: string | undefined | null) =>
+      str != null && str.toLowerCase().includes(q);
+    const homeTeam = m.homeId ? TEAMS_BY_ID.get(m.homeId) : undefined;
+    const awayTeam = m.awayId ? TEAMS_BY_ID.get(m.awayId) : undefined;
+    return (
+      check(homeTeam?.name)      || check(homeTeam?.shortName) || check(homeTeam?.code) ||
+      check(awayTeam?.name)      || check(awayTeam?.shortName) || check(awayTeam?.code) ||
+      check(m.homeLabel)         || check(m.awayLabel) ||
+      check(m.city)              || check(m.venue)
+    );
+  }
+
   // ── Derived select bindings ───────────────────────────────
   private get _groupValue() { return this._filter.type === 'group' ? (this._filter.value ?? '') : ''; }
   private get _teamValue()  { return this._filter.type === 'team'  ? (this._filter.value ?? '') : ''; }
@@ -431,6 +515,8 @@ export class FwcSchedule extends LitElement {
     const tz = this.timezone;
     const dateOf = (m: Match) => getLocalDateString(m.utc, tz);
     switch (type) {
+      case 'search':
+        return this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
       case 'today':
         return this.matchData.filter(m => dateOf(m) === getTodayString(tz));
       case 'date':
@@ -458,6 +544,7 @@ export class FwcSchedule extends LitElement {
     const tz = this.timezone;
     const today = getTodayString(tz);
     const { type } = this._filter;
+    const isSearch    = type === 'search';
     const isSingleDay = type === 'today' || type === 'date';
     const hasFavorites = this.favoriteTeamIds.length > 0;
     const minDate = this._minDate;
@@ -505,6 +592,49 @@ export class FwcSchedule extends LitElement {
               aria-pressed="${type === 'today'}"
               @click="${() => this._set({ type: 'today' })}"
             >Today</button>
+
+            <!-- Search input — right after Today, expands to fill remaining space -->
+            <div class="search-wrap" role="search">
+              <svg class="search-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M9 9l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              <input
+                class="search-input"
+                type="search"
+                placeholder="Search teams…"
+                aria-label="Search matches by team name"
+                autocomplete="off"
+                .value="${this._searchQuery}"
+                @input="${(e: Event) => {
+                  const q = (e.target as HTMLInputElement).value;
+                  this._searchQuery = q;
+                  this._set(q.trim() ? { type: 'search' } : { type: 'all' });
+                }}"
+                @keydown="${(e: KeyboardEvent) => {
+                  if (e.key === 'Escape') {
+                    this._searchQuery = '';
+                    this._set({ type: 'all' });
+                    this._searchEl?.blur();
+                  }
+                }}"
+              />
+              ${this._searchQuery ? html`
+                <button
+                  class="search-clear"
+                  aria-label="Clear search"
+                  @click="${() => {
+                    this._searchQuery = '';
+                    this._set({ type: 'all' });
+                    this._searchEl?.focus();
+                  }}"
+                >
+                  <svg viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              ` : nothing}
+            </div>
 
             ${hasFavorites ? html`
               <button
@@ -576,7 +706,7 @@ export class FwcSchedule extends LitElement {
 
         <!-- ── Match list ────────────────────────────────── -->
         ${filtered.length === 0
-          ? this._renderEmpty(isSingleDay, viewDate, today)
+          ? this._renderEmpty(isSingleDay, isSearch, viewDate, today)
           : sortedDates.map(dateStr => {
               const dayMatches = byDate.get(dateStr) ?? [];
               const isToday = dateStr === today;
@@ -679,7 +809,7 @@ export class FwcSchedule extends LitElement {
     `;
   }
 
-  private _renderEmpty(isSingleDay: boolean, viewDate: string, today: string) {
+  private _renderEmpty(isSingleDay: boolean, isSearch: boolean, viewDate: string, today: string) {
     const fmt = formatMatchTime(
       new Date(viewDate + 'T12:00:00').toISOString(),
       this.timezone
@@ -687,11 +817,13 @@ export class FwcSchedule extends LitElement {
     return html`
       <div class="empty-state" role="status">
         <div class="empty-icon">⚽</div>
-        <p>${isSingleDay
-          ? `No matches on ${viewDate === today ? 'today' : fmt.dateShort}.`
-          : 'No matches found for this filter.'
+        <p>${isSearch
+          ? `No matches found for "${this._searchQuery}".`
+          : isSingleDay
+            ? `No matches on ${viewDate === today ? 'today' : fmt.dateShort}.`
+            : 'No matches found for this filter.'
         }</p>
-        ${isSingleDay ? html`
+        ${isSingleDay && !isSearch ? html`
           <p class="empty-hint">Use the ← → arrows in a day header to find the next match day.</p>
         ` : nothing}
       </div>
