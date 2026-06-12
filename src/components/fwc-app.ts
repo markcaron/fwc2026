@@ -300,6 +300,25 @@ export class FwcApp extends LitElement {
     this._matches = applyScores(MATCHES, payload);
   }
 
+  private _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _startPoll(): void {
+    this._stopPoll();
+    // Refresh every 60 s while visible — matches the /api/scores CDN
+    // stale-while-revalidate=60 TTL so we never serve staler data than
+    // the cache already holds (#12)
+    this._pollTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') this._loadScores();
+    }, 60_000);
+  }
+
+  private _stopPoll(): void {
+    if (this._pollTimer !== null) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+  }
+
   private _onVisibilityChange = (): void => {
     if (document.visibilityState === 'visible') {
       this._loadScores();
@@ -324,12 +343,14 @@ export class FwcApp extends LitElement {
     document.addEventListener('visibilitychange', this._onVisibilityChange);
     this._tick();
     this._tickTimer = setInterval(() => this._tick(), 1000);
+    this._startPoll();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
     if (this._tickTimer !== null) clearInterval(this._tickTimer);
+    this._stopPoll();
   }
 
   private _handlePrefsChanged(e: Event) {
