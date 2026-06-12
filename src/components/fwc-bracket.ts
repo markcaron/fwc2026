@@ -120,6 +120,14 @@ export class FwcBracket extends LitElement {
       font-weight: 600;
       color: var(--fwc-gold-text);
     }
+    /* Shared kick-off time row — appears once between home and away (#16) */
+    .slot-time-row {
+      justify-content: center;
+      border-top: 1px solid var(--fwc-border-subtle);
+      border-bottom: 1px solid var(--fwc-border-subtle);
+      padding: 3px 0;
+      margin: 1px 0;
+    }
 
     .venue-line {
       font-size: 0.68rem;
@@ -275,9 +283,16 @@ export class FwcBracket extends LitElement {
             </span>
             ${hasScore
               ? html`<span class="team-score ${homeWon ? 'winner' : ''}" aria-label="Score: ${match.homeScore}">${match.homeScore}</span>`
-              : html`<span class="team-time">${fmt.time}</span>`
+              : nothing
             }
           </div>
+
+          <!-- Kick-off time shown once between teams for scheduled matches -->
+          ${!hasScore ? html`
+            <div class="team-row slot-time-row" aria-hidden="true">
+              <span class="team-time">${fmt.time}</span>
+            </div>
+          ` : nothing}
 
           <!-- Away / bottom team -->
           <div class="team-row">
@@ -290,7 +305,7 @@ export class FwcBracket extends LitElement {
             </span>
             ${hasScore
               ? html`<span class="team-score ${awayWon ? 'winner' : ''}" aria-label="Score: ${match.awayScore}">${match.awayScore}</span>`
-              : html`<span class="team-time">${fmt.time}</span>`
+              : nothing
             }
           </div>
         </div>
