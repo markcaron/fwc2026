@@ -213,6 +213,39 @@ export class FwcSchedule extends LitElement {
       align-items: center;
       gap: 8px;
       min-width: 0;
+      justify-content: center;
+    }
+
+    /*
+     * Native <input type="date"> styled to blend into the heading.
+     * Appears and reads like the plain-text label but opens the
+     * platform date picker on click/tap — no custom picker needed.
+     */
+    .date-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: none;
+      border-bottom: 1.5px solid var(--fwc-border);
+      padding: 1px 4px 2px;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+      cursor: pointer;
+      text-align: center;
+      min-width: 0;
+      max-width: 160px;
+      transition: border-color 0.15s;
+    }
+    .date-input:hover {
+      border-color: var(--fwc-accent);
+      color: var(--fwc-text);
+    }
+    .date-input:focus-visible {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+      border-radius: 3px;
     }
 
     /*
@@ -306,6 +339,28 @@ export class FwcSchedule extends LitElement {
     this._filter = newDate === today
       ? { type: 'today' }
       : { type: 'date', value: newDate };
+  }
+
+  /** Navigate to a specific date string (YYYY-MM-DD).
+   *  If there are no matches on that exact date, clamp to the nearest match day. */
+  private _navigateToDate(dateStr: string): void {
+    const days = this._getMatchDays();
+    const today = getTodayString(this.timezone);
+    // If an exact match exists, use it; otherwise find the nearest day
+    const exact = days.find(d => d === dateStr);
+    if (exact) {
+      this._filter = exact === today ? { type: 'today' } : { type: 'date', value: exact };
+      return;
+    }
+    // Find closest day by date arithmetic
+    const target = new Date(dateStr + 'T12:00:00Z').getTime();
+    let nearest = days[0];
+    let minDiff = Infinity;
+    for (const d of days) {
+      const diff = Math.abs(new Date(d + 'T12:00:00Z').getTime() - target);
+      if (diff < minDiff) { minDiff = diff; nearest = d; }
+    }
+    this._filter = nearest === today ? { type: 'today' } : { type: 'date', value: nearest };
   }
 
   private get _filteredMatches(): Match[] {
@@ -483,7 +538,20 @@ export class FwcSchedule extends LitElement {
                     ` : nothing}
 
                     <div class="day-header-content">
-                      <span>${dayLabel}</span>
+                      ${isSingleDay
+                        ? html`
+                          <input
+                            type="date"
+                            class="date-input"
+                            .value="${viewDate}"
+                            min="2026-06-11"
+                            max="2026-07-19"
+                            aria-label="Jump to date"
+                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
+                          />
+                        `
+                        : html`<span>${dayLabel}</span>`
+                      }
                       ${isToday && showTodayPill
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
