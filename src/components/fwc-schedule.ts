@@ -217,35 +217,48 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Native <input type="date"> styled to blend into the heading.
-     * Appears and reads like the plain-text label but opens the
-     * platform date picker on click/tap — no custom picker needed.
+     * Calendar-icon date picker: the visible button triggers showPicker()
+     * on a hidden <input type="date">. The text label stays human-readable
+     * (e.g. "Thursday, Jun 11") while the icon gives access to the picker.
      */
-    .date-input {
-      appearance: none;
-      -webkit-appearance: none;
+    .date-pick-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .date-pick-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
       background: none;
-      border: none;
-      border-bottom: 1.5px solid var(--fwc-border);
-      padding: 1px 4px 2px;
-      font: inherit;
-      font-size: 0.82rem;
-      font-weight: 700;
+      border: 1px solid var(--fwc-border);
+      border-radius: 6px;
       color: var(--fwc-text-muted);
       cursor: pointer;
-      text-align: center;
-      min-width: 0;
-      max-width: 160px;
-      transition: border-color 0.15s;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .date-input:hover {
-      border-color: var(--fwc-accent);
+    .date-pick-btn:hover {
+      background: var(--fwc-bg-surface);
       color: var(--fwc-text);
+      border-color: var(--fwc-accent);
     }
-    .date-input:focus-visible {
+    .date-pick-btn:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
-      border-radius: 3px;
+    }
+    .date-pick-btn svg { width: 14px; height: 14px; }
+    /* Hidden input — only used to access the native date picker via showPicker() */
+    .date-input-hidden {
+      position: absolute;
+      width: 0;
+      height: 0;
+      opacity: 0;
+      pointer-events: none;
+      inset: 0;
     }
 
     /*
@@ -538,26 +551,44 @@ export class FwcSchedule extends LitElement {
                     ` : nothing}
 
                     <div class="day-header-content">
-                      ${isSingleDay
-                        ? html`
-                          <input
-                            type="date"
-                            class="date-input"
-                            .value="${viewDate}"
-                            min="2026-06-11"
-                            max="2026-07-19"
-                            aria-label="Jump to date"
-                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
-                          />
-                        `
-                        : html`<span>${dayLabel}</span>`
-                      }
+                      <span>${dayLabel}</span>
                       ${isToday && showTodayPill
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
                       <span class="count-label">
                         ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
                       </span>
+                      ${isSingleDay ? html`
+                        <div class="date-pick-wrap">
+                          <button
+                            class="date-pick-btn"
+                            aria-label="Jump to date"
+                            title="Jump to date"
+                            @click="${(e: Event) => {
+                              const wrap = (e.currentTarget as HTMLElement).parentElement!;
+                              const inp = wrap.querySelector<HTMLInputElement>('.date-input-hidden');
+                              inp?.showPicker?.();
+                            }}"
+                          >
+                            <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                              <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                              <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
+                              <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                              <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                            </svg>
+                          </button>
+                          <input
+                            class="date-input-hidden"
+                            type="date"
+                            .value="${viewDate}"
+                            min="2026-06-11"
+                            max="2026-07-19"
+                            tabindex="-1"
+                            aria-hidden="true"
+                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
+                          />
+                        </div>
+                      ` : nothing}
                     </div>
 
                     ${isSingleDay ? html`
