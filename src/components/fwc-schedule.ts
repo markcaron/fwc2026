@@ -729,7 +729,25 @@ export class FwcSchedule extends LitElement {
                 aria-pressed="${type === 'today'}"
                 @click="${() => this._set({ type: 'today' })}"
               >Today</button>
-              <div class="view-toggle-date-wrap ${type === 'date' ? 'active' : ''}">
+              <!-- Wrapper is the single tab stop; input is tabindex="-1" to
+                   avoid exposing Chrome's internal month/day/year sub-fields.
+                   Space/Enter on the wrapper calls showPicker() — keyboard
+                   gestures carry user activation across Shadow DOM boundaries. -->
+              <div
+                class="view-toggle-date-wrap ${type === 'date' ? 'active' : ''}"
+                tabindex="0"
+                role="button"
+                aria-pressed="${type === 'date'}"
+                aria-label="${type === 'date' && this._filter.value
+                  ? `Date: ${formatMatchTime(this._filter.value + 'T12:00:00Z', tz).dateShort}`
+                  : 'Pick a match date'}"
+                @keydown="${(e: KeyboardEvent) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    this.shadowRoot?.querySelector<HTMLInputElement>('.view-toggle-date')?.showPicker?.();
+                  }
+                }}"
+              >
                 <svg viewBox="0 0 14 14" fill="none" aria-hidden="true" style="position:relative;z-index:1;pointer-events:none">
                   <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
                   <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
@@ -744,7 +762,8 @@ export class FwcSchedule extends LitElement {
                 <input
                   class="view-toggle-date"
                   type="date"
-                  aria-label="Pick a match date"
+                  tabindex="-1"
+                  aria-hidden="true"
                   .value="${type === 'date' && this._filter.value ? this._filter.value : ''}"
                   min="${minDate}"
                   max="${maxDate}"
