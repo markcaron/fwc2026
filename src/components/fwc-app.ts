@@ -113,21 +113,18 @@ export class FwcApp extends LitElement {
     }
 
     /* ── Countdown strip ─────────────────────────────────────── */
-    /*
-     * Sits between the header and the tab bar. Shows time remaining until
-     * the next scheduled (or live) match. Hides itself when there's no
-     * upcoming match (tournament over) or during a live match.
-     */
     .countdown-strip {
-      background: var(--fwc-bg-surface);
-      border-bottom: 1px solid var(--fwc-border-subtle);
-      padding: 6px 16px;
+      background: var(--fwc-bg-raised);
+      border: 1px solid var(--fwc-border-subtle);
+      padding: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
       font-size: 0.78rem;
       color: var(--fwc-text-muted);
+      border-radius: 12px;
+      margin: 16px 4px;
     }
     .countdown-strip.live-now {
       background: color-mix(in srgb, var(--fwc-danger) 8%, transparent);
