@@ -296,50 +296,63 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker. The visible <button> lives in Shadow DOM;
-     * the actual <input type="date"> is appended to document.body (light DOM)
-     * in connectedCallback. iOS Safari does not open the native date picker
-     * for inputs inside a Shadow Root regardless of activation method
-     * (showPicker, .click(), label routing, or direct touch all fail).
-     * Moving the input to the light DOM fixes this: user-activation is a
-     * Window-level flag preserved through Shadow DOM event handlers, so
-     * showPicker() called on a light-DOM input from a Shadow-DOM click
-     * handler works correctly on iOS Safari 16+.
+     * Date picker: Shadow DOM <input type="date"> is the primary interactive
+     * element, sized to exactly match the wrapper. An aria-hidden ghost <span>
+     * (pointer-events:none) sits on top and renders the calendar-button
+     * appearance. Clicks/taps pass through the ghost to the input below.
+     * No light DOM, no showPicker(), no state management needed.
      */
     .date-pick-wrap {
       position: relative;
       display: inline-flex;
-      align-items: center;
+      width: 36px;
+      height: 36px;
       flex-shrink: 0;
     }
-    .date-pick-btn {
+    /* The real interactive element — invisible, fills the wrapper exactly */
+    .date-pick-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      color: transparent;
+      border: none;
+      outline: none;
+      cursor: pointer;
+    }
+    .date-pick-input::-webkit-calendar-picker-indicator { opacity: 0; }
+    /* Ghost: the visible "button" — pointer-events:none so clicks fall through */
+    .date-pick-ghost {
+      position: absolute;
+      inset: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 36px;
-      min-height: 36px;
-      background: none;
+      background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
       color: var(--fwc-text-muted);
-      cursor: pointer;
-      font-family: inherit;
+      pointer-events: none;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .date-pick-btn:hover {
+    .date-pick-ghost svg { width: 18px; height: 18px; }
+    /* Pseudo-states driven via :has() since the ghost has pointer-events:none */
+    .date-pick-wrap:hover .date-pick-ghost {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:active {
+    .date-pick-wrap:has(.date-pick-input:active) .date-pick-ghost {
       background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
-    .date-pick-btn:focus-visible {
+    .date-pick-wrap:has(.date-pick-input:focus-visible) .date-pick-ghost {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-btn svg { width: 18px; height: 18px; }
 
     /*
      * date-pill: same gold-pill style used in the app header's date badge.
@@ -414,61 +427,6 @@ export class FwcSchedule extends LitElement {
   }
   private get _maxDate(): string {
     return this.matchData.reduce((a, b) => a.utc > b.utc ? a : b).utc.slice(0, 10);
-  }
-
-  /**
-   * Light-DOM input appended to document.body. iOS Safari does not open the
-   * native date picker for <input type="date"> inside a Shadow Root; the input
-   * must live in the light DOM. showPicker() on this element is called from
-   * the Shadow-DOM button click — user activation is a Window-level flag and
-   * is preserved through Shadow DOM event handlers.
-   */
-  private _lightInput: HTMLInputElement | null = null;
-  private _onLightInputChange = (e: Event) => {
-    this._navigateToDate((e.target as HTMLInputElement).value);
-  };
-
-  override connectedCallback() {
-    super.connectedCallback();
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.tabIndex = -1;
-    input.setAttribute('aria-hidden', 'true');
-    // Start off-screen; repositioned to the button before showPicker() so the
-    // desktop picker popup appears at the right location.
-    input.style.cssText =
-      'position:fixed;top:0;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
-    input.addEventListener('change', this._onLightInputChange);
-    document.body.appendChild(input);
-    this._lightInput = input;
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
-    this._lightInput?.removeEventListener('change', this._onLightInputChange);
-    this._lightInput?.remove();
-    this._lightInput = null;
-  }
-
-  /** Reposition the light-DOM input under the button on pointerdown so the
-   *  layout is committed before showPicker() is called on click. */
-  private _positionLightInput(): void {
-    const input = this._lightInput;
-    const btn = this.shadowRoot?.querySelector<HTMLElement>('.date-pick-btn');
-    if (!input || !btn) return;
-    const r = btn.getBoundingClientRect();
-    input.style.cssText =
-      `position:fixed;top:${r.bottom}px;left:${r.left}px;` +
-      `width:${r.width}px;height:1px;opacity:0;pointer-events:none;`;
-  }
-
-  private _openDatePicker(): void {
-    const input = this._lightInput;
-    if (!input) return;
-    input.value = this._viewingDate;
-    input.min = this._minDate;
-    input.max = this._maxDate;
-    input.showPicker?.();
   }
 
   /** Current search query — drives the 'search' filter type. */
@@ -828,20 +786,24 @@ export class FwcSchedule extends LitElement {
                         : nothing}
                       ${isSingleDay ? html`
                         <div class="date-pick-wrap">
-                          <button
-                            class="date-pick-btn"
-                            type="button"
+                          <input
+                            class="date-pick-input"
+                            type="date"
                             aria-label="Pick a match date"
-                            @pointerdown="${() => this._positionLightInput()}"
-                            @click="${() => this._openDatePicker()}"
-                          >
+                            .value="${viewDate}"
+                            min="${minDate}"
+                            max="${maxDate}"
+                            @change="${(e: Event) =>
+                              this._navigateToDate((e.target as HTMLInputElement).value)}"
+                          />
+                          <span class="date-pick-ghost" aria-hidden="true">
                             <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
                               <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
                               <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
                               <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                               <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                             </svg>
-                          </button>
+                          </span>
                         </div>
                       ` : nothing}
                       <span class="count-label">
