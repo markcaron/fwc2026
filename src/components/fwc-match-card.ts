@@ -1,7 +1,8 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Match, Team } from '../lib/types.js';
-import { TEAMS_BY_ID } from '../lib/data.js';
+import { TEAMS_BY_ID, GROUP_COLORS } from '../lib/data.js';
+import type { GroupLetter } from '../lib/data.js';
 import { formatMatchTime } from '../lib/time.js';
 import { ROUND_LABELS } from '../lib/types.js';
 
@@ -191,6 +192,13 @@ export class FwcMatchCard extends LitElement {
     return this.match.awayId ? TEAMS_BY_ID.get(this.match.awayId) : undefined;
   }
 
+  /** Returns an inline style string for a group badge, or '' if no group. */
+  private _groupBadgeStyle(group: string | undefined): string {
+    if (!group) return '';
+    const gc = GROUP_COLORS[group as GroupLetter];
+    return gc ? `background:${gc.hdr};color:${gc.text};border-color:transparent;` : '';
+  }
+
   render() {
     const { match, timezone, favoriteTeamIds } = this;
     const home = this._home;
@@ -224,7 +232,7 @@ export class FwcMatchCard extends LitElement {
       >
         <div class="meta" aria-hidden="true">
           ${isLive ? html`<span class="badge live" role="status">Live</span>` : nothing}
-          ${metaLabel ? html`<span class="badge">${metaLabel}</span>` : nothing}
+          ${metaLabel ? html`<span class="badge" style="${this._groupBadgeStyle(match.group)}">${metaLabel}</span>` : nothing}
           <span>${match.city}</span>
           <span>·</span>
           <span>${match.venue}</span>

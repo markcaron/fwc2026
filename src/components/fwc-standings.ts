@@ -1,7 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings } from '../lib/data.js';
+import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings, GROUP_COLORS } from '../lib/data.js';
 import type { Match, GroupStanding } from '../lib/types.js';
+import type { GroupLetter } from '../lib/data.js';
 
 @customElement('fwc-standings')
 export class FwcStandings extends LitElement {
@@ -32,7 +33,6 @@ export class FwcStandings extends LitElement {
     }
 
     .group-header {
-      background: var(--fwc-bg-surface);
       padding: 8px 12px;
       font-size: 0.82rem;
       font-weight: 700;
@@ -41,12 +41,11 @@ export class FwcStandings extends LitElement {
       display: flex;
       align-items: center;
       gap: 6px;
+      /* background set inline via group color */
     }
     .group-letter {
       width: 22px;
       height: 22px;
-      background: var(--fwc-gold);
-      color: var(--fwc-text-on-gold);
       border-radius: 4px;
       display: flex;
       align-items: center;
@@ -76,19 +75,8 @@ export class FwcStandings extends LitElement {
       transition: background 0.1s;
     }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--fwc-bg-overlay); }
-
-    /* Position row coloring */
-    tbody tr.pos-1,
-    tbody tr.pos-2 {
-      background: var(--fwc-qualified-bg);
-    }
-    tbody tr.pos-3 {
-      background: var(--fwc-playoff-bg);
-    }
-    tbody tr.pos-1:hover,
-    tbody tr.pos-2:hover { background: var(--fwc-qualified-bg); }
-    tbody tr.pos-3:hover  { background: var(--fwc-playoff-bg); }
+    /* row tint set inline per group — no global pos-1/pos-2/pos-3 overrides needed */
+    tbody tr:hover { filter: brightness(0.97); }
 
     /* highlight-ring: navy-500 in light (6.1:1 on white ✓), gold in dark */
     tbody tr.favorite-row {
@@ -119,16 +107,16 @@ export class FwcStandings extends LitElement {
       align-items: center;
       gap: 5px;
     }
+    /* pos-indicator: a transparent slot that holds a small SVG shape.
+     * ▲ (filled triangle) for top 2, ○ (outlined circle) for 3rd.
+     * Position, shape AND color together → not color alone (WCAG 1.4.1). */
     .pos-indicator {
-      width: 4px;
-      height: 20px;
-      border-radius: 2px;
+      width: 14px;
       flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .pos-1 .pos-indicator,
-    .pos-2 .pos-indicator { background: var(--fwc-qualified); }
-    .pos-3 .pos-indicator { background: var(--fwc-playoff); }
-    .pos-4 .pos-indicator { background: transparent; }
 
     .team-flag {
       font-size: 1rem;
@@ -146,8 +134,11 @@ export class FwcStandings extends LitElement {
     /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .team-name.favorite { color: var(--fwc-gold-text); }
 
+    /* Legend at the bottom — SVG markers use currentColor so they follow
+     * the system text color in both light and dark mode. */
     .legend {
-      margin-top: 10px;
+      margin-top: 12px;
+      padding: 0 2px;
       display: flex;
       gap: 16px;
       flex-wrap: wrap;
@@ -155,17 +146,14 @@ export class FwcStandings extends LitElement {
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 0.7rem;
-      color: var(--fwc-text-subtle);
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--fwc-text-muted);
     }
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
+    .legend-item svg {
+      color: var(--fwc-text);   /* currentColor for fill / stroke */
+      flex-shrink: 0;
     }
-    .legend-dot.qualified { background: var(--fwc-qualified); }
-    .legend-dot.playoff   { background: var(--fwc-playoff); }
   `;
 
   @property({ type: Array }) matchData: Match[] = [...MATCHES];
@@ -177,14 +165,18 @@ export class FwcStandings extends LitElement {
         <div class="groups-grid">
           ${GROUPS.map(g => this._renderGroup(g))}
         </div>
-        <div class="legend" role="note" aria-label="Table legend">
+        <div class="legend" role="note" aria-label="Standings key">
           <div class="legend-item">
-            <div class="legend-dot qualified" aria-hidden="true"></div>
-            <span>Advance (top 2)</span>
+            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+              <polygon points="4,0 8,8 0,8" fill="currentColor"/>
+            </svg>
+            <span>Top 2 advance to knockouts</span>
           </div>
           <div class="legend-item">
-            <div class="legend-dot playoff" aria-hidden="true"></div>
-            <span>Possible 3rd-place advance</span>
+            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+              <circle cx="4" cy="4" r="3.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+            <span>3rd place may advance</span>
           </div>
         </div>
       </div>
@@ -193,11 +185,27 @@ export class FwcStandings extends LitElement {
 
   private _renderGroup(group: string) {
     const standings: GroupStanding[] = computeStandings(group, this.matchData);
+    const gc = GROUP_COLORS[group as GroupLetter];
+    const hdrStyle = `background:${gc.hdr};color:${gc.text};`;
+    const letterStyle = `background:rgba(0,0,0,0.12);color:${gc.text};`;
+
+    // SVG indicators: ▲ filled triangle (top 2), ○ outlined circle (3rd)
+    const indicator = (pos: number) => {
+      if (pos <= 2) return html`
+        <svg class="pos-indicator" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <polygon points="4,0 8,8 0,8" fill="${gc.ind}"/>
+        </svg>`;
+      if (pos === 3) return html`
+        <svg class="pos-indicator" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <circle cx="4" cy="4" r="3.2" fill="none" stroke="${gc.ind}" stroke-width="1.3"/>
+        </svg>`;
+      return html`<span class="pos-indicator" aria-hidden="true"></span>`;
+    };
 
     return html`
       <div class="group-card">
-        <div class="group-header">
-          <div class="group-letter" aria-hidden="true">${group}</div>
+        <div class="group-header" style="${hdrStyle}">
+          <div class="group-letter" style="${letterStyle}" aria-hidden="true">${group}</div>
           <span>Group ${group}</span>
         </div>
         <table aria-label="Group ${group} standings">
@@ -214,19 +222,29 @@ export class FwcStandings extends LitElement {
           </thead>
           <tbody>
             ${standings.map((s, i) => {
-              const pos = i + 1;
+              const pos  = i + 1;
               const team = TEAMS_BY_ID.get(s.teamId);
               const isFav = this.favoriteTeamIds.includes(s.teamId);
               const gdStr = s.gd > 0 ? `+${s.gd}` : `${s.gd}`;
 
+              // Use explicit tint / tint3 properties — no fragile string-replace
+              const rowBg = pos <= 2 ? gc.tint : pos === 3 ? gc.tint3 : '';
+              const rowStyle = rowBg ? `background:${rowBg};` : '';
+
+              // Advancement note in aria-label satisfies WCAG 1.4.1 (non-color indicator)
+              const advNote = pos <= 2 ? ', advances to knockout round'
+                            : pos === 3 ? ', possible third-place advance'
+                            : '';
+
               return html`
                 <tr
-                  class="pos-${pos} ${isFav ? 'favorite-row' : ''}"
-                  aria-label="${team?.name ?? s.teamId}: ${s.points} points, played ${s.played}"
+                  class="${isFav ? 'favorite-row' : ''}"
+                  style="${rowStyle}"
+                  aria-label="${team?.name ?? s.teamId}: ${s.points} points, played ${s.played}${advNote}"
                 >
-                  <td class="team-col pos-${pos}">
+                  <td class="team-col">
                     <div class="team-cell">
-                      <div class="pos-indicator" aria-hidden="true"></div>
+                      ${indicator(pos)}
                       <span class="team-flag" role="img" aria-label="${team?.name ?? ''} flag">
                         ${team?.flag ?? '🏳'}
                       </span>
