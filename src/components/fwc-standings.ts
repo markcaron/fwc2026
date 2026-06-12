@@ -107,19 +107,15 @@ export class FwcStandings extends LitElement {
       align-items: center;
       gap: 5px;
     }
-    /* pos-indicator: a colored tile with a symbol marker so advancement
-     * status is conveyed by shape/text AND color (WCAG 1.4.1). */
+    /* pos-indicator: a transparent slot that holds a small SVG shape.
+     * ▲ (filled triangle) for top 2, ○ (outlined circle) for 3rd.
+     * Position, shape AND color together → not color alone (WCAG 1.4.1). */
     .pos-indicator {
-      width: 20px;
-      height: 20px;
-      border-radius: 3px;
+      width: 14px;
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.65rem;
-      font-weight: 900;
-      line-height: 1;
     }
 
     .team-flag {
@@ -136,7 +132,29 @@ export class FwcStandings extends LitElement {
       max-width: 80px;
     }
     /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
+    /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .team-name.favorite { color: var(--fwc-gold-text); }
+
+    /* Legend at the bottom — SVG markers use currentColor so they follow
+     * the system text color in both light and dark mode. */
+    .legend {
+      margin-top: 12px;
+      padding: 0 2px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--fwc-text-muted);
+    }
+    .legend-item svg {
+      color: var(--fwc-text);   /* currentColor for fill / stroke */
+      flex-shrink: 0;
+    }
   `;
 
   @property({ type: Array }) matchData: Match[] = [...MATCHES];
@@ -148,6 +166,20 @@ export class FwcStandings extends LitElement {
         <div class="groups-grid">
           ${GROUPS.map(g => this._renderGroup(g))}
         </div>
+        <div class="legend" role="note" aria-label="Standings key">
+          <div class="legend-item">
+            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+              <polygon points="4,0 8,8 0,8" fill="currentColor"/>
+            </svg>
+            <span>Top 2 advance to knockouts</span>
+          </div>
+          <div class="legend-item">
+            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+              <circle cx="4" cy="4" r="3.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+            <span>3rd place may advance</span>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -158,9 +190,18 @@ export class FwcStandings extends LitElement {
     const hdrStyle = `background:${gc.hdr};color:${gc.text};`;
     const letterStyle = `background:rgba(0,0,0,0.12);color:${gc.text};`;
 
-    // Pos markers: convey advancement by symbol AND color (WCAG 1.4.1)
-    // ↑ = top-2, advances to Round of 32; ≈ = 3rd, possible advance
-    const MARKER: Record<number, string> = { 1: '↑', 2: '↑', 3: '≈' };
+    // SVG indicators: ▲ filled triangle (top 2), ○ outlined circle (3rd)
+    const indicator = (pos: number) => {
+      if (pos <= 2) return html`
+        <svg class="pos-indicator" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <polygon points="4,0 8,8 0,8" fill="${gc.ind}"/>
+        </svg>`;
+      if (pos === 3) return html`
+        <svg class="pos-indicator" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <circle cx="4" cy="4" r="3.2" fill="none" stroke="${gc.ind}" stroke-width="1.3"/>
+        </svg>`;
+      return html`<span class="pos-indicator" aria-hidden="true"></span>`;
+    };
 
     return html`
       <div class="group-card">
@@ -196,12 +237,6 @@ export class FwcStandings extends LitElement {
                             : pos === 3 ? ', possible third-place advance'
                             : '';
 
-              const marker = MARKER[pos] ?? '';
-              // Marker background matches the group header color; text from gc.text
-              const markerStyle = marker
-                ? `background:${gc.hdr};color:${gc.text};`
-                : 'background:transparent;';
-
               return html`
                 <tr
                   class="${isFav ? 'favorite-row' : ''}"
@@ -210,9 +245,7 @@ export class FwcStandings extends LitElement {
                 >
                   <td class="team-col">
                     <div class="team-cell">
-                      <div class="pos-indicator" style="${markerStyle}" aria-hidden="true">
-                        ${marker}
-                      </div>
+                      ${indicator(pos)}
                       <span class="team-flag" role="img" aria-label="${team?.name ?? ''} flag">
                         ${team?.flag ?? '🏳'}
                       </span>

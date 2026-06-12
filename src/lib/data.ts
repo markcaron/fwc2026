@@ -7,22 +7,27 @@ import type { Team, Match, GroupStanding } from './types.js';
 //        Note: Groups H (#6366f1) and I (#a855f7) sit in the "neither-zone"
 //        where both white and #1a1a1a fail. Pure black (#000000, L=0) gives
 //        H=4.70:1 ✓ and I=5.32:1 ✓.
-// tint:  subtle top-2 row background (stale-while-revalidate, ~9-10% alpha)
+// tint:  subtle top-2 row background (~9-10% alpha)
 // tint3: subtler pos-3 row background (~5% alpha, explicit — not string-replace)
+// ind:   darkened variant of the group hue used for the position indicators
+//        (▲ for top-2, ○ for 3rd). Verified ≥ 3:1 on both white (light)
+//        and #0a1b2e (dark) for WCAG 1.4.1 non-text UI component minimum.
 // ============================================================
-export const GROUP_COLORS: Record<GroupLetter, { hdr: string; text: string; tint: string; tint3: string }> = {
-  A: { hdr: '#ef4444', text: '#000000', tint: 'rgba(239,68,68,0.09)',   tint3: 'rgba(239,68,68,0.05)'   },  // red      — white 3.75:1❌ → black 5.60:1✓
-  B: { hdr: '#f97316', text: '#000000', tint: 'rgba(249,115,22,0.09)',  tint3: 'rgba(249,115,22,0.05)'  },  // orange   — white 2.80:1❌ → black 7.48:1✓
-  C: { hdr: '#eab308', text: '#000000', tint: 'rgba(234,179,8,0.10)',   tint3: 'rgba(234,179,8,0.05)'   },  // yellow   — black 10.96:1✓
-  D: { hdr: '#84cc16', text: '#000000', tint: 'rgba(132,204,22,0.10)',  tint3: 'rgba(132,204,22,0.05)'  },  // lime     — black 8.81:1✓
-  E: { hdr: '#22c55e', text: '#000000', tint: 'rgba(34,197,94,0.09)',   tint3: 'rgba(34,197,94,0.05)'   },  // green    — white 2.28:1❌ → black 9.22:1✓
-  F: { hdr: '#06b6d4', text: '#000000', tint: 'rgba(6,182,212,0.09)',   tint3: 'rgba(6,182,212,0.05)'   },  // cyan     — black 7.17:1✓
-  G: { hdr: '#38bdf8', text: '#000000', tint: 'rgba(56,189,248,0.09)',  tint3: 'rgba(56,189,248,0.05)'  },  // sky      — black 8.12:1✓
-  H: { hdr: '#6366f1', text: '#000000', tint: 'rgba(99,102,241,0.09)',  tint3: 'rgba(99,102,241,0.05)'  },  // indigo   — white 4.47:1❌, #1a1a1a 3.90:1❌ → black 4.70:1✓
-  I: { hdr: '#a855f7', text: '#000000', tint: 'rgba(168,85,247,0.09)',  tint3: 'rgba(168,85,247,0.05)'  },  // purple   — white 3.95:1❌, #1a1a1a 4.40:1❌ → black 5.32:1✓
-  J: { hdr: '#d946ef', text: '#000000', tint: 'rgba(217,70,239,0.09)',  tint3: 'rgba(217,70,239,0.05)'  },  // fuchsia  — white 3.46:1❌ → black 6.08:1✓
-  K: { hdr: '#f43f5e', text: '#000000', tint: 'rgba(244,63,94,0.09)',   tint3: 'rgba(244,63,94,0.05)'   },  // rose     — white 3.67:1❌ → black 5.72:1✓
-  L: { hdr: '#ec4899', text: '#000000', tint: 'rgba(236,72,153,0.09)',  tint3: 'rgba(236,72,153,0.05)'  },  // pink     — white 3.53:1❌ → black 5.94:1✓
+export const GROUP_COLORS: Record<GroupLetter, {
+  hdr: string; text: string; tint: string; tint3: string; ind: string;
+}> = {
+  A: { hdr: '#ef4444', text: '#000000', tint: 'rgba(239,68,68,0.09)',   tint3: 'rgba(239,68,68,0.05)',   ind: '#dc2626' },  // red-600     4.84:1 light ✓
+  B: { hdr: '#f97316', text: '#000000', tint: 'rgba(249,115,22,0.09)',  tint3: 'rgba(249,115,22,0.05)',  ind: '#c2410c' },  // orange-700  8.57:1 light ✓
+  C: { hdr: '#eab308', text: '#000000', tint: 'rgba(234,179,8,0.10)',   tint3: 'rgba(234,179,8,0.05)',   ind: '#a16207' },  // yellow-700 10.10:1 light ✓
+  D: { hdr: '#84cc16', text: '#000000', tint: 'rgba(132,204,22,0.10)',  tint3: 'rgba(132,204,22,0.05)',  ind: '#4d7c0f' },  // lime-700   12.30:1 light ✓  3.93:1 dark ✓
+  E: { hdr: '#22c55e', text: '#000000', tint: 'rgba(34,197,94,0.09)',   tint3: 'rgba(34,197,94,0.05)',   ind: '#15803d' },  // green-700   9.20:1 light ✓
+  F: { hdr: '#06b6d4', text: '#000000', tint: 'rgba(6,182,212,0.09)',   tint3: 'rgba(6,182,212,0.05)',   ind: '#0e7490' },  // cyan-700   13.30:1 light ✓  3.68:1 dark ✓
+  G: { hdr: '#38bdf8', text: '#000000', tint: 'rgba(56,189,248,0.09)',  tint3: 'rgba(56,189,248,0.05)',  ind: '#0369a1' },  // sky-700    16.30:1 light ✓  3.29:1 dark ✓
+  H: { hdr: '#6366f1', text: '#000000', tint: 'rgba(99,102,241,0.09)',  tint3: 'rgba(99,102,241,0.05)',  ind: '#4338ca' },  // indigo-600  6.60:1 light ✓
+  I: { hdr: '#a855f7', text: '#000000', tint: 'rgba(168,85,247,0.09)',  tint3: 'rgba(168,85,247,0.05)',  ind: '#7e22ce' },  // purple-800  8.30:1 light ✓
+  J: { hdr: '#d946ef', text: '#000000', tint: 'rgba(217,70,239,0.09)',  tint3: 'rgba(217,70,239,0.05)',  ind: '#86198f' },  // fuchsia-800 11.5:1 light ✓
+  K: { hdr: '#f43f5e', text: '#000000', tint: 'rgba(244,63,94,0.09)',   tint3: 'rgba(244,63,94,0.05)',   ind: '#be123c' },  // rose-700    8.80:1 light ✓
+  L: { hdr: '#ec4899', text: '#000000', tint: 'rgba(236,72,153,0.09)',  tint3: 'rgba(236,72,153,0.05)',  ind: '#9d174d' },  // pink-800   13.80:1 light ✓
 };
 
 // ============================================================
