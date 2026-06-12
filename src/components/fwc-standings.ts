@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings } from '../lib/data.js';
+import { MATCHES, GROUPS, TEAMS_BY_ID, computeStandings, GROUP_COLORS } from '../lib/data.js';
 import type { Match, GroupStanding } from '../lib/types.js';
 
 @customElement('fwc-standings')
@@ -32,7 +32,6 @@ export class FwcStandings extends LitElement {
     }
 
     .group-header {
-      background: var(--fwc-bg-surface);
       padding: 8px 12px;
       font-size: 0.82rem;
       font-weight: 700;
@@ -41,12 +40,11 @@ export class FwcStandings extends LitElement {
       display: flex;
       align-items: center;
       gap: 6px;
+      /* background set inline via group color */
     }
     .group-letter {
       width: 22px;
       height: 22px;
-      background: var(--fwc-gold);
-      color: var(--fwc-text-on-gold);
       border-radius: 4px;
       display: flex;
       align-items: center;
@@ -193,11 +191,17 @@ export class FwcStandings extends LitElement {
 
   private _renderGroup(group: string) {
     const standings: GroupStanding[] = computeStandings(group, this.matchData);
+    const gc = GROUP_COLORS[group];
+    // CSS color-scheme-aware background & text applied inline so they pick up
+    // light/dark values without needing a Shadow DOM custom property.
+    const headerBg   = `light-dark(${gc.light}, ${gc.dark})`;
+    const letterStyle = `background:${headerBg};color:${gc.text};`;
+    const headerStyle = `background:${headerBg};`;
 
     return html`
       <div class="group-card">
-        <div class="group-header">
-          <div class="group-letter" aria-hidden="true">${group}</div>
+        <div class="group-header" style="${headerStyle}">
+          <div class="group-letter" style="${letterStyle}" aria-hidden="true">${group}</div>
           <span>Group ${group}</span>
         </div>
         <table aria-label="Group ${group} standings">

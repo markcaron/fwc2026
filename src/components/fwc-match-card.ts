@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Match, Team } from '../lib/types.js';
-import { TEAMS_BY_ID } from '../lib/data.js';
+import { TEAMS_BY_ID, GROUP_COLORS } from '../lib/data.js';
 import { formatMatchTime } from '../lib/time.js';
 import { ROUND_LABELS } from '../lib/types.js';
 
@@ -218,7 +218,13 @@ export class FwcMatchCard extends LitElement {
       >
         <div class="meta" aria-hidden="true">
           ${isLive ? html`<span class="badge live" role="status">Live</span>` : nothing}
-          ${metaLabel ? html`<span class="badge">${metaLabel}</span>` : nothing}
+          ${metaLabel ? (() => {
+              const gc = match.group ? GROUP_COLORS[match.group] : null;
+              const style = gc
+                ? `background:light-dark(${gc.light},${gc.dark});color:${gc.text};border-color:transparent;`
+                : '';
+              return html`<span class="badge" style="${style}">${metaLabel}</span>`;
+            })() : nothing}
           <span>${match.city}</span>
           <span>·</span>
           <span>${match.venue}</span>
