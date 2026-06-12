@@ -270,7 +270,7 @@ export class FwcApp extends LitElement {
       </header>
 
       <!-- Tab bar below the floating header -->
-      <nav class="tab-bar" role="navigation" aria-label="Main navigation">
+      <nav class="tab-bar" aria-label="Main navigation">
         <div class="tab-list" role="tablist">
           <button
             class="tab-btn" id="tab-schedule" role="tab"
@@ -325,7 +325,7 @@ export class FwcApp extends LitElement {
       <main class="app-content" id="main-content">
         <div class="tab-panel" id="panel-schedule" role="tabpanel"
              aria-labelledby="tab-schedule"
-             ?data-active="${active === 'schedule'}" tabindex="0">
+             ?data-active="${active === 'schedule'}"
           <fwc-schedule
             .matchData="${matches}"
             .timezone="${prefs.timezone}"
@@ -335,7 +335,7 @@ export class FwcApp extends LitElement {
 
         <div class="tab-panel" id="panel-groups" role="tabpanel"
              aria-labelledby="tab-groups"
-             ?data-active="${active === 'groups'}" tabindex="0">
+             ?data-active="${active === 'groups'}"
           <fwc-standings
             .matchData="${matches}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
@@ -344,7 +344,7 @@ export class FwcApp extends LitElement {
 
         <div class="tab-panel" id="panel-bracket" role="tabpanel"
              aria-labelledby="tab-bracket"
-             ?data-active="${active === 'bracket'}" tabindex="0">
+             ?data-active="${active === 'bracket'}"
           <fwc-bracket
             .matchData="${matches}"
             .timezone="${prefs.timezone}"

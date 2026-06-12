@@ -531,7 +531,7 @@ export class FwcSchedule extends LitElement {
 
   private _renderEmpty(isSingleDay: boolean, viewDate: string, today: string) {
     const fmt = formatMatchTime(
-      new Date(viewDate + 'T12:00:00').toISOString(),
+      new Date(viewDate + 'T12:00:00Z').toISOString(),
       this.timezone
     );
     return html`

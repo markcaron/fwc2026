@@ -25,11 +25,16 @@ export class FwcMatchCard extends LitElement {
     }
     .card.live {
       border-color: var(--fwc-danger);
-      animation: livePulse 2s ease-in-out infinite;
+      /* Static fallback: solid danger border visible when motion is reduced */
+      box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm);
     }
-    @keyframes livePulse {
-      0%, 100% { box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm); }
-      50%       { box-shadow: 0 0 8px 2px rgba(218,41,28,0.4), var(--fwc-shadow-sm); }
+    /* Pulse only for users who haven't opted out of motion (#9, WCAG 2.3.3) */
+    @media (prefers-reduced-motion: no-preference) {
+      .card.live { animation: livePulse 2s ease-in-out infinite; }
+      @keyframes livePulse {
+        0%, 100% { box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm); }
+        50%       { box-shadow: 0 0 8px 2px rgba(218,41,28,0.4), var(--fwc-shadow-sm); }
+      }
     }
 
     .meta {
@@ -139,12 +144,14 @@ export class FwcMatchCard extends LitElement {
       height: 7px;
       border-radius: 50%;
       background: var(--fwc-danger);
-      animation: dotPulse 1.2s ease-in-out infinite;
       flex-shrink: 0;
     }
-    @keyframes dotPulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.4; transform: scale(0.75); }
+    @media (prefers-reduced-motion: no-preference) {
+      .live-dot { animation: dotPulse 1.2s ease-in-out infinite; }
+      @keyframes dotPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.75); }
+      }
     }
 
     .footer {
