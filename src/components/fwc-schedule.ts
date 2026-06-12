@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property, query, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { MATCHES, TEAMS, GROUPS, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
@@ -296,59 +296,50 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Transparent date input overlaid on the calendar icon. The input IS the
-     * tap target — opacity:0 with inset:0 covers the full 36×36 hit area.
-     * The user taps/clicks the visible "button" but is directly activating
-     * the input, which the browser handles natively with no JS involved.
-     * This is the only reliable approach across iOS Safari, iOS Chrome, and
-     * desktop: showPicker(), programmatic .click(), and label→input activation
-     * all fail in a Shadow Root on iOS because the Shadow DOM boundary breaks
-     * user-activation propagation before the picker can be triggered.
+     * Calendar-icon date picker. The visible <button> lives in Shadow DOM;
+     * the actual <input type="date"> is appended to document.body (light DOM)
+     * in connectedCallback. iOS Safari does not open the native date picker
+     * for inputs inside a Shadow Root regardless of activation method
+     * (showPicker, .click(), label routing, or direct touch all fail).
+     * Moving the input to the light DOM fixes this: user-activation is a
+     * Window-level flag preserved through Shadow DOM event handlers, so
+     * showPicker() called on a light-DOM input from a Shadow-DOM click
+     * handler works correctly on iOS Safari 16+.
      */
     .date-pick-wrap {
       position: relative;
       display: inline-flex;
       align-items: center;
+      flex-shrink: 0;
+    }
+    .date-pick-btn {
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
       min-width: 36px;
       min-height: 36px;
-      flex-shrink: 0;
       background: none;
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
       color: var(--fwc-text-muted);
+      cursor: pointer;
+      font-family: inherit;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .date-pick-wrap:hover {
+    .date-pick-btn:hover {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
       border-color: var(--fwc-accent);
     }
-    .date-pick-wrap:active {
+    .date-pick-btn:active {
       background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
-    /*
-     * Focus ring shown on the wrapper when the transparent input is focused.
-     * The input's own outline is invisible (opacity:0 suppresses it), so this
-     * :has rule is the sole visible indicator.
-     */
-    .date-pick-wrap:has(.date-pick-input:focus-visible) {
+    .date-pick-btn:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-wrap svg {
-      width: 18px;
-      height: 18px;
-      pointer-events: none;
-    }
-    /* Transparent input covers the full wrapper — this is the tap target */
-    .date-pick-input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
+    .date-pick-btn svg { width: 18px; height: 18px; }
 
     /*
      * date-pill: same gold-pill style used in the app header's date badge.
@@ -423,6 +414,47 @@ export class FwcSchedule extends LitElement {
   }
   private get _maxDate(): string {
     return this.matchData.reduce((a, b) => a.utc > b.utc ? a : b).utc.slice(0, 10);
+  }
+
+  /**
+   * Light-DOM input appended to document.body. iOS Safari does not open the
+   * native date picker for <input type="date"> inside a Shadow Root; the input
+   * must live in the light DOM. showPicker() on this element is called from
+   * the Shadow-DOM button click — user activation is a Window-level flag and
+   * is preserved through Shadow DOM event handlers.
+   */
+  private _lightInput: HTMLInputElement | null = null;
+  private _onLightInputChange = (e: Event) => {
+    this._navigateToDate((e.target as HTMLInputElement).value);
+  };
+
+  override connectedCallback() {
+    super.connectedCallback();
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.tabIndex = -1;
+    input.setAttribute('aria-hidden', 'true');
+    input.style.cssText =
+      'position:fixed;top:0;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+    input.addEventListener('change', this._onLightInputChange);
+    document.body.appendChild(input);
+    this._lightInput = input;
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._lightInput?.removeEventListener('change', this._onLightInputChange);
+    this._lightInput?.remove();
+    this._lightInput = null;
+  }
+
+  private _openDatePicker(): void {
+    const input = this._lightInput;
+    if (!input) return;
+    input.value = this._viewingDate;
+    input.min = this._minDate;
+    input.max = this._maxDate;
+    input.showPicker?.();
   }
 
   /** Current search query — drives the 'search' filter type. */
@@ -782,21 +814,19 @@ export class FwcSchedule extends LitElement {
                         : nothing}
                       ${isSingleDay ? html`
                         <div class="date-pick-wrap">
-                          <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                            <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-                            <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
-                            <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                            <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                          </svg>
-                          <input
-                            class="date-pick-input"
-                            type="date"
+                          <button
+                            class="date-pick-btn"
+                            type="button"
                             aria-label="Pick a match date"
-                            .value="${viewDate}"
-                            min="${minDate}"
-                            max="${maxDate}"
-                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
-                          />
+                            @click="${() => this._openDatePicker()}"
+                          >
+                            <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                              <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                              <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
+                              <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                              <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                            </svg>
+                          </button>
                         </div>
                       ` : nothing}
                       <span class="count-label">
