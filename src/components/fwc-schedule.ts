@@ -296,13 +296,14 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker: the <label> IS the visible interactive
-     * element — there is no nested <button>. This is critical for iOS Safari:
-     * when a <label> contains no interactive child, tapping it fires native
-     * label→input activation, which reliably opens the date picker through a
-     * Shadow Root. Both showPicker() and programmatic .click() fail in Shadow
-     * DOM on iOS even when called from a synchronous user gesture handler.
-     * Keyboard users activate via Space/Enter → @keydown → _dateInput.click().
+     * Transparent date input overlaid on the calendar icon. The input IS the
+     * tap target — opacity:0 with inset:0 covers the full 36×36 hit area.
+     * The user taps/clicks the visible "button" but is directly activating
+     * the input, which the browser handles natively with no JS involved.
+     * This is the only reliable approach across iOS Safari, iOS Chrome, and
+     * desktop: showPicker(), programmatic .click(), and label→input activation
+     * all fail in a Shadow Root on iOS because the Shadow DOM boundary breaks
+     * user-activation propagation before the picker can be triggered.
      */
     .date-pick-wrap {
       position: relative;
@@ -316,7 +317,6 @@ export class FwcSchedule extends LitElement {
       border: 1px solid var(--fwc-border);
       border-radius: 6px;
       color: var(--fwc-text-muted);
-      cursor: pointer;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
     .date-pick-wrap:hover {
@@ -328,23 +328,26 @@ export class FwcSchedule extends LitElement {
       background: var(--fwc-bg-surface);
       border-color: var(--fwc-accent);
     }
-    .date-pick-wrap:focus-visible {
+    /*
+     * Focus ring shown on the wrapper when the transparent input is focused.
+     * The input's own outline is invisible (opacity:0 suppresses it), so this
+     * :has rule is the sole visible indicator.
+     */
+    .date-pick-wrap:has(.date-pick-input:focus-visible) {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-wrap svg { width: 18px; height: 18px; }
-    /*
-     * Hidden input anchored BELOW the wrapper so desktop browsers position
-     * the date picker popup below the label, not over it.
-     */
-    .date-input-hidden {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
+    .date-pick-wrap svg {
+      width: 18px;
+      height: 18px;
       pointer-events: none;
+    }
+    /* Transparent input covers the full wrapper — this is the tap target */
+    .date-pick-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
     }
 
     /*
@@ -413,9 +416,6 @@ export class FwcSchedule extends LitElement {
   @state() private _filter: ScheduleFilter = { type: 'today' };
   /** Text announced to screen readers when the schedule view changes. */
   @state() private _announcement = '';
-
-  /** Ref to the hidden date input — avoids fragile parentElement traversal. */
-  @query('.date-input-hidden') private _dateInput?: HTMLInputElement;
 
   /** Tournament bounds derived from the fixture list — never hardcoded. */
   private get _minDate(): string {
@@ -781,18 +781,7 @@ export class FwcSchedule extends LitElement {
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
                       ${isSingleDay ? html`
-                        <label
-                          class="date-pick-wrap"
-                          tabindex="0"
-                          role="button"
-                          aria-label="Pick a match date"
-                          @keydown="${(e: KeyboardEvent) => {
-                            if (e.key === ' ' || e.key === 'Enter') {
-                              e.preventDefault();
-                              this._dateInput?.click();
-                            }
-                          }}"
-                        >
+                        <div class="date-pick-wrap">
                           <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
                             <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
                             <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
@@ -800,16 +789,15 @@ export class FwcSchedule extends LitElement {
                             <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                           </svg>
                           <input
-                            class="date-input-hidden"
+                            class="date-pick-input"
                             type="date"
+                            aria-label="Pick a match date"
                             .value="${viewDate}"
                             min="${minDate}"
                             max="${maxDate}"
-                            tabindex="-1"
-                            aria-hidden="true"
                             @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
                           />
-                        </label>
+                        </div>
                       ` : nothing}
                       <span class="count-label">
                         ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
