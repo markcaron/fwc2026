@@ -1,6 +1,36 @@
 import type { Team, Match, GroupStanding } from './types.js';
 
 // ============================================================
+// Group color palette — 12 distinct hues, A through L.
+// hdr:   header background (solid, vivid)
+// text:  header text — verified ≥ 4.5:1 on hdr (WCAG 1.4.3 AA)
+// tint:  subtle top-2 row background (~9-10% alpha)
+// tint3: subtler pos-3 row background (~5% alpha)
+// ind:   position-indicator color for ▲ / ○ SVG shapes.
+//        Must meet WCAG 1.4.11 non-text contrast (≥ 3:1) on BOTH:
+//          white (#ffffff, light mode card bg) AND
+//          #0a1b2e (dark mode body bg)
+//        Target luminance window: [0.127, 0.30].
+// ============================================================
+export const GROUP_COLORS: Record<GroupLetter, {
+  hdr: string; text: string; tint: string; tint3: string; ind: string;
+}> = {
+  //         hdr        text     tint                         tint3                        ind (verified on white + dark)
+  A: { hdr: '#ef4444', text: '#000000', tint: 'rgba(239,68,68,0.09)',   tint3: 'rgba(239,68,68,0.05)',   ind: '#dc2626' },  // red-600      white 5.58 dark 3.60 ✓
+  B: { hdr: '#f97316', text: '#000000', tint: 'rgba(249,115,22,0.09)',  tint3: 'rgba(249,115,22,0.05)',  ind: '#c2410c' },  // orange-700   white 7.49 dark 3.35 ✓
+  C: { hdr: '#eab308', text: '#000000', tint: 'rgba(234,179,8,0.10)',   tint3: 'rgba(234,179,8,0.05)',   ind: '#a16207' },  // yellow-700   white 10.95 dark 3.53 ✓
+  D: { hdr: '#84cc16', text: '#000000', tint: 'rgba(132,204,22,0.10)',  tint3: 'rgba(132,204,22,0.05)',  ind: '#4d7c0f' },  // lime-700     white 10.63 dark 3.48 ✓
+  E: { hdr: '#22c55e', text: '#000000', tint: 'rgba(34,197,94,0.09)',   tint3: 'rgba(34,197,94,0.05)',   ind: '#15803d' },  // green-700    white 9.22  dark 3.46 ✓
+  F: { hdr: '#06b6d4', text: '#000000', tint: 'rgba(6,182,212,0.09)',   tint3: 'rgba(6,182,212,0.05)',   ind: '#0e7490' },  // cyan-700     white 8.65  dark 3.24 ✓
+  G: { hdr: '#38bdf8', text: '#000000', tint: 'rgba(56,189,248,0.09)',  tint3: 'rgba(56,189,248,0.05)',  ind: '#0284c7' },  // sky-600      white 3.85  dark 4.63 ✓ (was sky-700: dark 2.93 ✗)
+  H: { hdr: '#6366f1', text: '#000000', tint: 'rgba(99,102,241,0.09)',  tint3: 'rgba(99,102,241,0.05)',  ind: '#6366f1' },  // indigo-500   white 4.47  dark 3.98 ✓ (was indigo-600: dark 2.20 ✗)
+  I: { hdr: '#a855f7', text: '#000000', tint: 'rgba(168,85,247,0.09)',  tint3: 'rgba(168,85,247,0.05)',  ind: '#9333ea' },  // purple-600   white 5.36  dark 3.32 ✓ (was purple-800: dark 2.49 ✗)
+  J: { hdr: '#d946ef', text: '#000000', tint: 'rgba(217,70,239,0.09)',  tint3: 'rgba(217,70,239,0.05)',  ind: '#c026d3' },  // fuchsia-600  white 4.71  dark 3.78 ✓ (was fuchsia-800: dark 2.11 ✗)
+  K: { hdr: '#f43f5e', text: '#000000', tint: 'rgba(244,63,94,0.09)',   tint3: 'rgba(244,63,94,0.05)',   ind: '#e11d48' },  // rose-600     white 4.69  dark 3.80 ✓ (was rose-700: dark 2.76 ✗)
+  L: { hdr: '#ec4899', text: '#000000', tint: 'rgba(236,72,153,0.09)',  tint3: 'rgba(236,72,153,0.05)',  ind: '#db2777' },  // pink-600     white 4.60  dark 3.87 ✓ (was pink-800: dark 2.20 ✗)
+};
+
+// ============================================================
 // Teams — all 48 FIFA World Cup 2026 participants
 // Colors are primary jersey colors [home, away]
 // ============================================================

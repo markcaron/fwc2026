@@ -271,6 +271,11 @@ export class FwcSettings extends LitElement {
                 </optgroup>
               `)}
             </select>
+            ${!TIMEZONE_GROUPS.flatMap(g => g.zones).some(z => z.value === timezone) ? html`
+              <div class="hint" role="note">
+                Your timezone (<strong>${timezone}</strong>) is active but not shown in the list above.
+              </div>
+            ` : nothing}
             <div class="hint">
               Times across the schedule, bracket, and standings will update to reflect your selection.
             </div>
@@ -342,8 +347,9 @@ export class FwcSettings extends LitElement {
               Your preferences are saved locally in this browser.
             </p>
             <p style="margin-top:8px">
-              <a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026" target="_blank" rel="noopener">
-                Official FIFA website ↗
+              <a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026" target="_blank" rel="noopener noreferrer">
+                Official FIFA website
+                <span class="visually-hidden">(opens in new tab)</span> ↗
               </a>
             </p>
           </div>

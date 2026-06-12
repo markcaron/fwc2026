@@ -1,7 +1,8 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { Match, Team } from '../lib/types.js';
-import { TEAMS_BY_ID } from '../lib/data.js';
+import { TEAMS_BY_ID, GROUP_COLORS } from '../lib/data.js';
+import type { GroupLetter } from '../lib/data.js';
 import { formatMatchTime } from '../lib/time.js';
 import { ROUND_LABELS } from '../lib/types.js';
 
@@ -25,11 +26,16 @@ export class FwcMatchCard extends LitElement {
     }
     .card.live {
       border-color: var(--fwc-danger);
-      animation: livePulse 2s ease-in-out infinite;
+      /* Static fallback: solid danger border visible when motion is reduced */
+      box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm);
     }
-    @keyframes livePulse {
-      0%, 100% { box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm); }
-      50%       { box-shadow: 0 0 8px 2px rgba(218,41,28,0.4), var(--fwc-shadow-sm); }
+    /* Pulse only for users who haven't opted out of motion (#9, WCAG 2.3.3) */
+    @media (prefers-reduced-motion: no-preference) {
+      .card.live { animation: livePulse 2s ease-in-out infinite; }
+      @keyframes livePulse {
+        0%, 100% { box-shadow: 0 0 0 1px var(--fwc-danger), var(--fwc-shadow-sm); }
+        50%       { box-shadow: 0 0 8px 2px rgba(218,41,28,0.4), var(--fwc-shadow-sm); }
+      }
     }
 
     .meta {
@@ -115,12 +121,18 @@ export class FwcMatchCard extends LitElement {
       color: var(--fwc-gold-text);
     }
 
-    /* "Final" shown below the score for completed matches */
+    /* "Final" pill shown below the score for completed matches */
     .status-final {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      background: var(--fwc-bg-surface);
+      border: 1px solid var(--fwc-border);
+      border-radius: 20px;
       font-size: 0.68rem;
-      font-weight: 600;
-      color: var(--fwc-text-subtle);
-      letter-spacing: 0.03em;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+      margin-top: 2px;
     }
 
     /* Pulsing dot + "Live" shown in the score area when match is in-progress
@@ -139,12 +151,14 @@ export class FwcMatchCard extends LitElement {
       height: 7px;
       border-radius: 50%;
       background: var(--fwc-danger);
-      animation: dotPulse 1.2s ease-in-out infinite;
       flex-shrink: 0;
     }
-    @keyframes dotPulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.4; transform: scale(0.75); }
+    @media (prefers-reduced-motion: no-preference) {
+      .live-dot { animation: dotPulse 1.2s ease-in-out infinite; }
+      @keyframes dotPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.75); }
+      }
     }
 
     .footer {
@@ -185,6 +199,13 @@ export class FwcMatchCard extends LitElement {
     return this.match.awayId ? TEAMS_BY_ID.get(this.match.awayId) : undefined;
   }
 
+  /** Returns an inline style string for a group badge, or '' if no group. */
+  private _groupBadgeStyle(group: string | undefined): string {
+    if (!group) return '';
+    const gc = GROUP_COLORS[group as GroupLetter];
+    return gc ? `background:${gc.hdr};color:${gc.text};border-color:transparent;` : '';
+  }
+
   render() {
     const { match, timezone, favoriteTeamIds } = this;
     const home = this._home;
@@ -218,7 +239,7 @@ export class FwcMatchCard extends LitElement {
       >
         <div class="meta" aria-hidden="true">
           ${isLive ? html`<span class="badge live" role="status">Live</span>` : nothing}
-          ${metaLabel ? html`<span class="badge">${metaLabel}</span>` : nothing}
+          ${metaLabel ? html`<span class="badge" style="${this._groupBadgeStyle(match.group)}">${metaLabel}</span>` : nothing}
           <span>${match.city}</span>
           <span>·</span>
           <span>${match.venue}</span>

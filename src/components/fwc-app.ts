@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { loadPreferences, updatePreferences } from '../lib/storage.js';
 import { formatMatchTime } from '../lib/time.js';
-import { MATCHES } from '../lib/data.js';
+import { MATCHES, TEAMS_BY_ID } from '../lib/data.js';
 import { fetchScores, applyScores } from '../lib/scores.js';
 import { SCORES_URL } from '../lib/config.js';
 import type { Match, StoredPreferences, TabId } from '../lib/types.js';
@@ -112,6 +112,56 @@ export class FwcApp extends LitElement {
       flex-shrink: 0;
     }
 
+    /* ── Countdown strip ─────────────────────────────────────── */
+    .countdown-strip {
+      background: var(--fwc-bg-raised);
+      border: 1px solid var(--fwc-border-subtle);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      /* 0.82rem = ~13px: --fwc-text gives 7.5:1 in light, 9.5:1 in dark ✓
+         (--fwc-text-muted at 0.78rem failed dark-mode AA: 4.34:1 < 4.5:1) */
+      font-size: 0.82rem;
+      color: var(--fwc-text);
+      border-radius: 12px;
+      margin: 16px 4px;
+    }
+    .countdown-strip.live-now {
+      background: color-mix(in srgb, var(--fwc-danger) 8%, transparent);
+      color: var(--fwc-danger-text);
+    }
+    .countdown-label { font-weight: 400; }
+    .countdown-match {
+      font-weight: 600;
+      color: var(--fwc-text);
+    }
+    .countdown-match.live-now { color: var(--fwc-danger-text); }
+    .countdown-time {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: var(--fwc-text);
+      min-width: 48px;
+      text-align: center;
+    }
+    .live-pip {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fwc-danger);
+      flex-shrink: 0;
+    }
+    /* Pulse only when the user has not opted out of motion */
+    @media (prefers-reduced-motion: no-preference) {
+      .live-pip { animation: livePip 1.2s ease-in-out infinite; }
+      @keyframes livePip {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+      }
+    }
+
     /* ── Tab nav — coach-board underline style ───────────────── */
     /*
      * Moved from the bottom to just below the floating header.
@@ -203,6 +253,42 @@ export class FwcApp extends LitElement {
   @state() private _activeTab: TabId = 'schedule';
   /** Live match data — static MATCHES overlaid with any fetched scores. */
   @state() private _matches: Match[] = [...MATCHES];
+  @state() private _countdown = '';
+  /** Cached next match — set once per tick so _renderCountdown doesn't recompute. */
+  @state() private _nextMatchCache: Match | null = null;
+
+  /** Find the next live or upcoming match. Uses a 30-min lookback so a
+   *  match that kicked off recently (but hasn't updated to 'live' yet) doesn't
+   *  linger as "0m 00s" for a long time. */
+  private _computeNextMatch(): Match | null {
+    const now = Date.now();
+    const live = this._matches.find(m => m.status === 'live');
+    if (live) return live;
+    return this._matches
+      .filter(m => m.status === 'scheduled' && new Date(m.utc).getTime() > now - 60_000 * 30)
+      .sort((a, b) => new Date(a.utc).getTime() - new Date(b.utc).getTime())[0] ?? null;
+  }
+
+  private _tickTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _tick(): void {
+    const next = this._computeNextMatch();
+    this._nextMatchCache = next;
+    if (!next) { this._countdown = ''; return; }
+    if (next.status === 'live') { this._countdown = 'live'; return; }
+    const secs = Math.max(0, Math.floor((new Date(next.utc).getTime() - Date.now()) / 1000));
+    if (secs === 0) {
+      // Match is at kickoff but not yet flagged live — avoid misleading "0m 00s"
+      this._countdown = 'starting';
+      return;
+    }
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    this._countdown = h > 0
+      ? `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`
+      : `${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+  }
 
   private get _todayLabel(): string {
     return formatMatchTime(new Date().toISOString(), this._prefs.timezone).dateShort;
@@ -214,19 +300,57 @@ export class FwcApp extends LitElement {
     this._matches = applyScores(MATCHES, payload);
   }
 
+  private _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _startPoll(): void {
+    this._stopPoll();
+    // Refresh every 60 s while visible — matches the /api/scores CDN
+    // stale-while-revalidate=60 TTL so we never serve staler data than
+    // the cache already holds (#12)
+    this._pollTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') this._loadScores();
+    }, 60_000);
+  }
+
+  private _stopPoll(): void {
+    if (this._pollTimer !== null) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+  }
+
   private _onVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') this._loadScores();
+    if (document.visibilityState === 'visible') {
+      this._loadScores();
+      // Resume ticking when the tab comes back into focus
+      if (this._tickTimer === null) {
+        this._tick();
+        this._tickTimer = setInterval(() => this._tick(), 1000);
+      }
+    } else {
+      // Pause the interval while the tab is hidden — browsers throttle it
+      // anyway, but pausing explicitly avoids any accumulated lag on resume
+      if (this._tickTimer !== null) {
+        clearInterval(this._tickTimer);
+        this._tickTimer = null;
+      }
+    }
   };
 
   override connectedCallback(): void {
     super.connectedCallback();
     this._loadScores();
     document.addEventListener('visibilitychange', this._onVisibilityChange);
+    this._tick();
+    this._tickTimer = setInterval(() => this._tick(), 1000);
+    this._startPoll();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
+    if (this._tickTimer !== null) clearInterval(this._tickTimer);
+    this._stopPoll();
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -250,6 +374,54 @@ export class FwcApp extends LitElement {
     this.shadowRoot?.querySelector<HTMLButtonElement>(`#tab-${tabs[next]}`)?.focus();
   }
 
+  private _renderCountdown() {
+    const next = this._nextMatchCache;
+    if (!next || !this._countdown) return nothing;
+
+    const isLive     = this._countdown === 'live';
+    const isStarting = this._countdown === 'starting';
+    const homeTeam = next.homeId ? TEAMS_BY_ID.get(next.homeId) : null;
+    const awayTeam = next.awayId ? TEAMS_BY_ID.get(next.awayId) : null;
+    const homeLabel = homeTeam?.shortName ?? next.homeLabel ?? 'TBD';
+    const awayLabel = awayTeam?.shortName ?? next.awayLabel ?? 'TBD';
+    // "versus" in aria-label; "vs" in visible text (screen readers pronounce "vs" literally)
+    const matchVisual = `${homeLabel} vs ${awayLabel}`;
+    const matchAria   = `${homeLabel} versus ${awayLabel}`;
+
+    if (isLive) {
+      return html`
+        <div class="countdown-strip live-now" role="status"
+             aria-label="${matchAria} is live now">
+          <span class="live-pip" aria-hidden="true"></span>
+          <span class="countdown-match live-now">${matchVisual}</span>
+          <span class="countdown-label">is live now</span>
+        </div>
+      `;
+    }
+
+    if (isStarting) {
+      return html`
+        <div class="countdown-strip live-now" role="status"
+             aria-label="${matchAria} is starting now">
+          <span class="live-pip" aria-hidden="true"></span>
+          <span class="countdown-match live-now">${matchVisual}</span>
+          <span class="countdown-label">starting now</span>
+        </div>
+      `;
+    }
+
+    const fmt = formatMatchTime(next.utc, this._prefs.timezone);
+    return html`
+      <div class="countdown-strip" role="timer"
+           aria-label="Countdown to next match">
+        <span class="countdown-label">Next match in</span>
+        <span class="countdown-time">${this._countdown}</span>
+        <span class="countdown-match">${matchVisual}</span>
+        <span class="countdown-label">${fmt.dateShort} · ${fmt.time}</span>
+      </div>
+    `;
+  }
+
   render() {
     const { _prefs: prefs, _activeTab: active, _matches: matches } = this;
 
@@ -269,8 +441,11 @@ export class FwcApp extends LitElement {
         </div>
       </header>
 
+      <!-- Countdown / live strip — between header and tab bar -->
+      ${this._renderCountdown()}
+
       <!-- Tab bar below the floating header -->
-      <nav class="tab-bar" role="navigation" aria-label="Main navigation">
+      <nav class="tab-bar" aria-label="Main navigation">
         <div class="tab-list" role="tablist">
           <button
             class="tab-btn" id="tab-schedule" role="tab"
@@ -325,7 +500,7 @@ export class FwcApp extends LitElement {
       <main class="app-content" id="main-content">
         <div class="tab-panel" id="panel-schedule" role="tabpanel"
              aria-labelledby="tab-schedule"
-             ?data-active="${active === 'schedule'}" tabindex="0">
+             ?data-active="${active === 'schedule'}">
           <fwc-schedule
             .matchData="${matches}"
             .timezone="${prefs.timezone}"
@@ -335,7 +510,7 @@ export class FwcApp extends LitElement {
 
         <div class="tab-panel" id="panel-groups" role="tabpanel"
              aria-labelledby="tab-groups"
-             ?data-active="${active === 'groups'}" tabindex="0">
+             ?data-active="${active === 'groups'}">
           <fwc-standings
             .matchData="${matches}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
@@ -344,7 +519,7 @@ export class FwcApp extends LitElement {
 
         <div class="tab-panel" id="panel-bracket" role="tabpanel"
              aria-labelledby="tab-bracket"
-             ?data-active="${active === 'bracket'}" tabindex="0">
+             ?data-active="${active === 'bracket'}">
           <fwc-bracket
             .matchData="${matches}"
             .timezone="${prefs.timezone}"
@@ -354,7 +529,7 @@ export class FwcApp extends LitElement {
 
         <div class="tab-panel" id="panel-settings" role="tabpanel"
              aria-labelledby="tab-settings"
-             ?data-active="${active === 'settings'}" tabindex="0"
+             ?data-active="${active === 'settings'}"
              @preferences-changed="${this._handlePrefsChanged}">
           <fwc-settings
             .timezone="${prefs.timezone}"
