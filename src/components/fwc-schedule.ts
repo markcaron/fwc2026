@@ -301,8 +301,10 @@ export class FwcSchedule extends LitElement {
      * The date segment is a styled <input type="date"> — no ghost needed,
      * the native value display shows the selected date directly.
      */
-    /* No outer group border — each button owns its own border and they
-     * share edges via margin-right: -1px overlap */
+    /* Segmented pill group: no outer border — each button carries its own
+     * full border and adjacent buttons overlap by 1px via margin-right: -1px,
+     * creating a single shared edge. First child has no left border (pill
+     * start); last child (date wrap) has right border-radius (pill end). */
     .view-toggle-group {
       display: inline-flex;
       background: var(--fwc-bg-primary);
@@ -358,13 +360,21 @@ export class FwcSchedule extends LitElement {
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    .view-toggle-date-wrap svg {
+    .view-toggle-date-icon,
+    .view-toggle-date-label {
+      position: relative;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .view-toggle-date-icon {
       width: 12px;
       height: 12px;
       flex-shrink: 0;
-      pointer-events: none;
-      position: relative;
-      z-index: 1;
+    }
+    .view-toggle-date-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
     }
     .view-toggle-date-wrap:not(.active):hover {
       background: var(--fwc-bg-surface);
@@ -484,6 +494,7 @@ export class FwcSchedule extends LitElement {
   @state() private _preSearchFilter: ScheduleFilter = { type: 'today' };
 
   @query('.search-input') private _searchEl?: HTMLInputElement;
+  @query('.view-toggle-date') private _datePicker?: HTMLInputElement;
 
   // ── Fuzzy match helper ─────────────────────────────────────
   private _matchesSearch(query: string, m: Match): boolean {
@@ -641,6 +652,12 @@ export class FwcSchedule extends LitElement {
     // context. In single-day view (Today / Date filter) it's redundant.
     const showTodayPill = !isSingleDay;
 
+    // Formatted date for the date segment label and aria-label (avoids calling
+    // formatMatchTime twice for the same value in the same render cycle).
+    const dateShortLabel = type === 'date' && this._filter.value
+      ? formatMatchTime(this._filter.value + 'T12:00:00Z', tz).dateShort
+      : '';
+
     // Group matches by local date for rendering
     const byDate = new Map<string, Match[]>();
     for (const m of filtered) {
@@ -729,35 +746,33 @@ export class FwcSchedule extends LitElement {
                 aria-pressed="${type === 'today'}"
                 @click="${() => this._set({ type: 'today' })}"
               >Today</button>
-              <!-- Wrapper is the single tab stop; input is tabindex="-1" to
-                   avoid exposing Chrome's internal month/day/year sub-fields.
-                   Space/Enter on the wrapper calls showPicker() — keyboard
-                   gestures carry user activation across Shadow DOM boundaries. -->
+              <!-- Wrapper is the single tab stop (tabindex=0, role=button).
+                   The hidden input (tabindex=-1) is removed from the tab
+                   sequence to avoid Chrome's 3 internal month/day/year stops.
+                   @keydown + @click both call showPicker() so keyboard users
+                   AND VoiceOver/JAWS synthetic-click activation both work. -->
               <div
                 class="view-toggle-date-wrap ${type === 'date' ? 'active' : ''}"
                 tabindex="0"
                 role="button"
                 aria-pressed="${type === 'date'}"
-                aria-label="${type === 'date' && this._filter.value
-                  ? `Date: ${formatMatchTime(this._filter.value + 'T12:00:00Z', tz).dateShort}`
-                  : 'Pick a match date'}"
+                aria-label="${dateShortLabel ? `Date: ${dateShortLabel}` : 'Pick a match date'}"
                 @keydown="${(e: KeyboardEvent) => {
                   if (e.key === ' ' || e.key === 'Enter') {
                     e.preventDefault();
-                    this.shadowRoot?.querySelector<HTMLInputElement>('.view-toggle-date')?.showPicker?.();
+                    this._datePicker?.showPicker?.();
                   }
                 }}"
+                @click="${() => this._datePicker?.showPicker?.()}"
               >
-                <svg viewBox="0 0 14 14" fill="none" aria-hidden="true" style="position:relative;z-index:1;pointer-events:none">
+                <svg class="view-toggle-date-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                   <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
                   <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
                   <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                   <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                 </svg>
-                <span style="position:relative;z-index:1;font-size:0.78rem;font-weight:600;white-space:nowrap;pointer-events:none">
-                  ${type === 'date' && this._filter.value
-                    ? formatMatchTime(this._filter.value + 'T12:00:00Z', tz).dateShort
-                    : 'Date'}
+                <span class="view-toggle-date-label">
+                  ${dateShortLabel || 'Date'}
                 </span>
                 <input
                   class="view-toggle-date"

@@ -80,8 +80,8 @@ export class FwcApp extends LitElement {
      */
     .header-icon {
       display: inline-block;
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       background-color: var(--fwc-gold-400);
       -webkit-mask: url('/public/world-cup.svg') no-repeat center / contain;
       mask: url('/public/world-cup.svg') no-repeat center / contain;
