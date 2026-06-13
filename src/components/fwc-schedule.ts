@@ -4,15 +4,8 @@ import { MATCHES, TEAMS, GROUPS, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime, getLocalDateString, getTodayString } from '../lib/time.js';
 import type { Match, ScheduleFilter } from '../lib/types.js';
 import { ROUND_LABELS } from '../lib/types.js';
+import { CARET } from '../lib/icons.js';
 import './fwc-match-card.js';
-
-/** Down-chevron reused in every select chip */
-const CARET = html`
-  <svg class="chip-caret" viewBox="0 0 10 6" fill="none" aria-hidden="true" focusable="false">
-    <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-`;
 
 @customElement('fwc-schedule')
 export class FwcSchedule extends LitElement {
@@ -52,9 +45,7 @@ export class FwcSchedule extends LitElement {
       position: relative;
       display: inline-flex;
       align-items: center;
-      flex: 1;
-      min-width: 120px;
-      max-width: 280px;
+      width: 100%;
     }
     .search-icon {
       position: absolute;
@@ -229,6 +220,7 @@ export class FwcSchedule extends LitElement {
      */
     .day-header {
       padding: 10px 16px 6px;
+      min-height: 36px;
       font-size: 0.82rem;
       font-weight: 700;
       color: var(--fwc-text-muted);
@@ -303,56 +295,122 @@ export class FwcSchedule extends LitElement {
     }
 
     /*
-     * Calendar-icon date picker: the visible button triggers showPicker()
-     * on a hidden <input type="date">. The text label stays human-readable
-     * (e.g. "Thursday, Jun 11") while the icon gives access to the picker.
+     * Segmented view-mode toggle group (All Matches / Today / Date).
+     * Shared border + overflow:hidden creates the joined pill; inner buttons
+     * use border-left for dividers; first child removes its left border.
+     * The date segment is a styled <input type="date"> — no ghost needed,
+     * the native value display shows the selected date directly.
      */
-    .date-pick-wrap {
-      position: relative;
+    /* Segmented pill group: no outer border — each button carries its own
+     * full border and adjacent buttons overlap by 1px via margin-right: -1px,
+     * creating a single shared edge. First child has no left border (pill
+     * start); last child (date wrap) has right border-radius (pill end). */
+    .view-toggle-group {
       display: inline-flex;
-      align-items: center;
+      background: var(--fwc-bg-primary);
+      border-radius: 20px;
       flex-shrink: 0;
     }
-    .date-pick-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 36px;
+    .view-toggle-btn {
       min-height: 36px;
-      background: none;
+      padding: 0 14px;
+      background: transparent;
       border: 1px solid var(--fwc-border);
-      border-radius: 6px;
+      margin-right: -1px;
       color: var(--fwc-text-muted);
-      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
       font-family: inherit;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    .date-pick-btn:hover {
+    .view-toggle-btn:first-child {
+      border-radius: 19px 0 0 19px;
+    }
+    .view-toggle-btn:hover:not([aria-pressed="true"]) {
       background: var(--fwc-bg-surface);
       color: var(--fwc-text);
-      border-color: var(--fwc-accent);
     }
-    .date-pick-btn:active {
-      background: var(--fwc-bg-surface);
-      border-color: var(--fwc-accent);
+    .view-toggle-btn[aria-pressed="true"] {
+      position: relative;
+      z-index: 1;
+      background: var(--fwc-gold);
+      border-color: var(--fwc-gold);
+      color: var(--fwc-text-on-gold);
     }
-    .date-pick-btn:focus-visible {
+    .view-toggle-btn:focus-visible {
       outline: var(--fwc-focus-ring);
       outline-offset: var(--fwc-focus-offset);
     }
-    .date-pick-btn svg { width: 18px; height: 18px; }
-    /*
-     * Hidden input is anchored at the BOTTOM of the wrapper so the browser
-     * positions the native date picker popup below the button, not over it.
-     */
-    .date-input-hidden {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
+
+    /* Date segment: wrapper owns the border; input is a full-size transparent
+     * overlay so the entire area opens the picker on all platforms */
+    .view-toggle-date-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 18px 0 14px;
+      min-height: 36px;
+      border: 1px solid var(--fwc-border);
+      border-radius: 0 19px 19px 0;
+      color: var(--fwc-text-muted);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .view-toggle-date-icon,
+    .view-toggle-date-label {
+      position: relative;
+      z-index: 1;
       pointer-events: none;
+    }
+    .view-toggle-date-icon {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+    }
+    .view-toggle-date-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .view-toggle-date-wrap:not(.active):hover {
+      background: var(--fwc-bg-surface);
+      color: var(--fwc-text);
+    }
+    .view-toggle-date-wrap.active {
+      z-index: 1;
+      background: var(--fwc-gold);
+      border-color: var(--fwc-gold);
+      color: var(--fwc-text-on-gold);
+    }
+    /* :focus-within catches focus on the invisible opacity:0 input where
+     * :focus-visible may not fire reliably on hidden elements */
+    .view-toggle-date-wrap:focus-within {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+    /* Invisible full-size input overlay — covers the entire wrapper so any
+     * tap/click on the segment opens the picker, not just the indicator area */
+    .view-toggle-date {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .view-toggle-date::-webkit-calendar-picker-indicator {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      margin: 0;
+      padding: 0;
     }
 
     /*
@@ -422,9 +480,6 @@ export class FwcSchedule extends LitElement {
   /** Text announced to screen readers when the schedule view changes. */
   @state() private _announcement = '';
 
-  /** Ref to the hidden date input — avoids fragile parentElement traversal. */
-  @query('.date-input-hidden') private _dateInput?: HTMLInputElement;
-
   /** Tournament bounds derived from the fixture list — never hardcoded. */
   private get _minDate(): string {
     return this.matchData.reduce((a, b) => a.utc < b.utc ? a : b).utc.slice(0, 10);
@@ -439,6 +494,7 @@ export class FwcSchedule extends LitElement {
   @state() private _preSearchFilter: ScheduleFilter = { type: 'today' };
 
   @query('.search-input') private _searchEl?: HTMLInputElement;
+  @query('.view-toggle-date') private _datePicker?: HTMLInputElement;
 
   // ── Fuzzy match helper ─────────────────────────────────────
   private _matchesSearch(query: string, m: Match): boolean {
@@ -518,40 +574,53 @@ export class FwcSchedule extends LitElement {
     this._announce(nearest, true /* snapped */);
   }
 
-  /** Update the live-region announcement after a navigation. */
+  /** Update the live-region announcement after a navigation.
+   *  Resets to '' first so re-picking the same date still triggers a
+   *  new DOM mutation that AT will announce (WCAG 4.1.3). */
   private _announce(dateStr: string, snapped = false): void {
     const fmt = formatMatchTime(dateStr + 'T12:00:00Z', this.timezone);
     const label = `Showing matches for ${fmt.dayOfWeek}, ${fmt.dateShort}`;
-    this._announcement = snapped
-      ? `${label} (nearest match day)`
-      : label;
+    const text = snapped ? `${label} (nearest match day)` : label;
+    this._announcement = '';
+    Promise.resolve().then(() => { this._announcement = text; });
   }
 
   private get _filteredMatches(): Match[] {
     const { type, value } = this._filter;
     const tz = this.timezone;
     const dateOf = (m: Match) => getLocalDateString(m.utc, tz);
+    const byKickOff = (a: Match, b: Match) =>
+      new Date(a.utc).getTime() - new Date(b.utc).getTime();
+    let results: Match[];
     switch (type) {
       case 'search':
-        return this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        results = this.matchData.filter(m => this._matchesSearch(this._searchQuery, m));
+        break;
       case 'today':
-        return this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        results = this.matchData.filter(m => dateOf(m) === getTodayString(tz));
+        break;
       case 'date':
-        return this.matchData.filter(m => dateOf(m) === value);
+        results = this.matchData.filter(m => dateOf(m) === value);
+        break;
       case 'favorites':
-        return this.matchData.filter(m =>
+        results = this.matchData.filter(m =>
           (m.homeId && this.favoriteTeamIds.includes(m.homeId)) ||
           (m.awayId && this.favoriteTeamIds.includes(m.awayId))
         );
+        break;
       case 'group':
-        return this.matchData.filter(m => m.round === 'group' && m.group === value);
+        results = this.matchData.filter(m => m.round === 'group' && m.group === value);
+        break;
       case 'team':
-        return this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        results = this.matchData.filter(m => m.homeId === value || m.awayId === value);
+        break;
       case 'round':
-        return this.matchData.filter(m => m.round === value);
+        results = this.matchData.filter(m => m.round === value);
+        break;
       default:
-        return [...this.matchData];
+        results = [...this.matchData];
     }
+    return results.sort(byKickOff);
   }
 
   private _set(filter: ScheduleFilter) {
@@ -583,6 +652,12 @@ export class FwcSchedule extends LitElement {
     // context. In single-day view (Today / Date filter) it's redundant.
     const showTodayPill = !isSingleDay;
 
+    // Formatted date for the date segment label and aria-label (avoids calling
+    // formatMatchTime twice for the same value in the same render cycle).
+    const dateShortLabel = type === 'date' && this._filter.value
+      ? formatMatchTime(this._filter.value + 'T12:00:00Z', tz).dateShort
+      : '';
+
     // Group matches by local date for rendering
     const byDate = new Map<string, Match[]>();
     for (const m of filtered) {
@@ -607,21 +682,8 @@ export class FwcSchedule extends LitElement {
         <!-- ── Filter bar ────────────────────────────────── -->
         <div class="filter-bar">
 
-          <!-- Row 1: quick toggles -->
-          <div class="filter-group" role="group" aria-label="Quick filters">
-            <button
-              class="filter-btn"
-              aria-pressed="${type === 'all'}"
-              @click="${() => this._set({ type: 'all' })}"
-            >All Matches</button>
-
-            <button
-              class="filter-btn"
-              aria-pressed="${type === 'today'}"
-              @click="${() => this._set({ type: 'today' })}"
-            >Today</button>
-
-            <!-- Search — role="search" omitted (landmark scope is the full region above) -->
+          <!-- Row 1: search (full width) -->
+          <div class="filter-group">
             <div class="search-wrap">
               <svg class="search-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>
@@ -639,8 +701,6 @@ export class FwcSchedule extends LitElement {
                 .value="${this._searchQuery}"
                 @input="${(e: Event) => {
                   const q = (e.target as HTMLInputElement).value;
-                  // Capture current filter before switching to search so we
-                  // can restore it when the user cancels (#15)
                   if (this._filter.type !== 'search' && q.trim()) {
                     this._preSearchFilter = { ...this._filter };
                   }
@@ -649,7 +709,7 @@ export class FwcSchedule extends LitElement {
                 }}"
                 @keydown="${(e: KeyboardEvent) => {
                   if (e.key === 'Escape') {
-                    this._set(this._preSearchFilter); // restores Today/All/etc.
+                    this._set(this._preSearchFilter);
                     this._searchEl?.blur();
                   }
                 }}"
@@ -659,7 +719,7 @@ export class FwcSchedule extends LitElement {
                   class="search-clear"
                   aria-label="Clear search"
                   @click="${() => {
-                    this._set(this._preSearchFilter); // restores Today/All/etc.
+                    this._set(this._preSearchFilter);
                     this._searchEl?.focus();
                   }}"
                 >
@@ -669,19 +729,77 @@ export class FwcSchedule extends LitElement {
                 </button>
               ` : nothing}
             </div>
+          </div>
+
+          <div class="filter-divider" role="separator" aria-hidden="true"></div>
+
+          <!-- Row 2: segmented view-mode group + standalone Favorites -->
+          <div class="filter-group" role="group" aria-label="View filters">
+            <div class="view-toggle-group">
+              <button
+                class="view-toggle-btn"
+                aria-pressed="${type === 'all'}"
+                @click="${() => this._set({ type: 'all' })}"
+              >All Matches</button>
+              <button
+                class="view-toggle-btn"
+                aria-pressed="${type === 'today'}"
+                @click="${() => this._set({ type: 'today' })}"
+              >Today</button>
+              <!-- Wrapper is the single tab stop (tabindex=0, role=button).
+                   The hidden input (tabindex=-1) is removed from the tab
+                   sequence to avoid Chrome's 3 internal month/day/year stops.
+                   @keydown + @click both call showPicker() so keyboard users
+                   AND VoiceOver/JAWS synthetic-click activation both work. -->
+              <div
+                class="view-toggle-date-wrap ${type === 'date' ? 'active' : ''}"
+                tabindex="0"
+                role="button"
+                aria-pressed="${type === 'date'}"
+                aria-label="${dateShortLabel ? `Date: ${dateShortLabel}` : 'Pick a match date'}"
+                @keydown="${(e: KeyboardEvent) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    this._datePicker?.showPicker?.();
+                  }
+                }}"
+                @click="${() => this._datePicker?.showPicker?.()}"
+              >
+                <svg class="view-toggle-date-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                  <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
+                  <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                </svg>
+                <span class="view-toggle-date-label">
+                  ${dateShortLabel || 'Date'}
+                </span>
+                <input
+                  class="view-toggle-date"
+                  type="date"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  .value="${type === 'date' && this._filter.value ? this._filter.value : ''}"
+                  min="${minDate}"
+                  max="${maxDate}"
+                  @change="${(e: Event) =>
+                    this._navigateToDate((e.target as HTMLInputElement).value)}"
+                />
+              </div>
+            </div>
 
             ${hasFavorites ? html`
               <button
                 class="filter-btn"
                 aria-pressed="${type === 'favorites'}"
                 @click="${() => this._set({ type: 'favorites' })}"
-            ><span class="btn-icon" aria-hidden="true"></span> Favorites</button>
+              ><span class="btn-icon" aria-hidden="true"></span> Favorites</button>
             ` : nothing}
           </div>
 
           <div class="filter-divider" role="separator" aria-hidden="true"></div>
 
-          <!-- Row 2: dimensional select chips -->
+          <!-- Row 3: dimensional select chips (unchanged) -->
           <div class="filter-group" role="group" aria-label="Filter by dimension">
             <div class="chip-wrap ${type === 'group' ? 'active' : ''}">
               <select
@@ -775,32 +893,6 @@ export class FwcSchedule extends LitElement {
                       ${isToday && showTodayPill
                         ? html`<span class="date-pill" role="note">Today</span>`
                         : nothing}
-                      ${isSingleDay ? html`
-                        <div class="date-pick-wrap">
-                          <button
-                            class="date-pick-btn"
-                            aria-label="Pick a match date"
-                            @click="${() => this._dateInput?.showPicker?.()}"
-                          >
-                            <svg viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                              <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-                              <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2"/>
-                              <line x1="4.5" y1="1" x2="4.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                              <line x1="9.5" y1="1" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                            </svg>
-                          </button>
-                          <input
-                            class="date-input-hidden"
-                            type="date"
-                            .value="${viewDate}"
-                            min="${minDate}"
-                            max="${maxDate}"
-                            tabindex="-1"
-                            aria-hidden="true"
-                            @change="${(e: Event) => this._navigateToDate((e.target as HTMLInputElement).value)}"
-                          />
-                        </div>
-                      ` : nothing}
                       <span class="count-label">
                         ${dayMatches.length} match${dayMatches.length !== 1 ? 'es' : ''}
                       </span>

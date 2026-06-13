@@ -4,7 +4,27 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
-## [1.0.0] — 2026-06-12
+## [1.1.0] — Canada release — 2026-06-13
+
+### Enhancements
+
+- **Filter bar redesign** — Schedule filter bar reorganised into three clear rows: full-width search on Row 1; a segmented view-mode group (All Matches / Today / 📅 Date) plus Favorites on Row 2; dimensional filters (Group / Team / Round) on Row 3. The date picker moves from the day header into Row 2 as a chip whose label updates to show the selected date (e.g. "Jun 15"). Day header retains ← → navigation arrows. ([#25](https://github.com/markcaron/fwc2026/pull/25), closes [#21](https://github.com/markcaron/fwc2026/issues/21))
+- **Header icon** — Trophy icon in the app header scaled up to 36 × 36 px for better visual balance ([#25](https://github.com/markcaron/fwc2026/pull/25))
+
+### Bug fixes
+
+- **Schedule sort order** — Matches within a day were rendered in fixture-list order (group A → B → … → L → knockouts) instead of ascending kick-off time. All filter modes now return matches sorted chronologically. ([#22](https://github.com/markcaron/fwc2026/pull/22), closes [#19](https://github.com/markcaron/fwc2026/issues/19))
+- **Date picker — iOS Safari / iOS Chrome** — `showPicker()` and programmatic `.click()` both fail inside a Shadow Root on iOS. Fixed by using a Shadow DOM `<input type="date">` as the direct tap target (with an `aria-hidden` ghost element for visual presentation), so the user's touch lands on the input natively without any JavaScript intermediary. ([#24](https://github.com/markcaron/fwc2026/pull/24), closes [#20](https://github.com/markcaron/fwc2026/issues/20))
+
+### Accessibility & polish
+
+- **Timezone select chip style** — The timezone `<select>` in Settings now matches the pill-chip appearance (pill radius, custom SVG caret, hover state) used by the schedule filter selects. Shared CARET SVG extracted to `src/lib/icons.ts` to avoid duplication. ([#23](https://github.com/markcaron/fwc2026/pull/23), closes [#18](https://github.com/markcaron/fwc2026/issues/18))
+- **Date segment keyboard & screen reader** — The date segment in the new filter bar uses `role="button"` with `tabindex="0"` as a single tab stop (avoiding Chrome's three internal month/day/year sub-fields). Both `@keydown` (Space/Enter) and `@click` trigger `showPicker()` so VoiceOver double-tap and JAWS virtual-mode activation both open the picker.
+- **`_announce()` re-announcement** — Live-region text is reset to `''` before each navigation announcement so re-selecting the same date still produces a new DOM mutation that screen readers announce (WCAG 4.1.3).
+
+---
+
+## [1.0.0] — USA release — 2026-06-12
 
 ### New features
 
