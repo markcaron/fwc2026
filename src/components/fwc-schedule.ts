@@ -68,6 +68,11 @@ export class FwcSchedule extends LitElement {
       font-family: inherit;
       transition: border-color 0.15s;
     }
+    /* iOS Safari zooms any focused input whose font-size is below 16px.
+     * pointer:coarse targets touch screens; pointer:fine leaves desktop alone. */
+    @media (pointer: coarse) {
+      .search-input { font-size: 1rem; }
+    }
     .search-input::placeholder { color: var(--fwc-text-muted); }
     .search-input:focus-visible {
       outline: var(--fwc-focus-ring);
