@@ -4,6 +4,14 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
+## [1.1.1] — 2026-06-14
+
+### Bug fixes
+
+- **Search input iOS zoom** — iOS Safari auto-zooms the viewport when a focused `<input>` has `font-size < 16px`. The search field was `0.78rem` (~12.5px). Fixed with `@media (pointer: coarse)` to override to `1rem` (16px) on touch screens; desktop retains `0.78rem`. ([#27](https://github.com/markcaron/fwc2026/pull/27))
+
+---
+
 ## [1.1.0] — Canada release — 2026-06-13
 
 ### Enhancements
