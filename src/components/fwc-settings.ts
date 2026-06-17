@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { TEAMS, GROUPS } from '../lib/data.js';
 import { TIMEZONE_GROUPS } from '../lib/time.js';
 import type { StoredPreferences } from '../lib/types.js';
@@ -247,10 +247,259 @@ export class FwcSettings extends LitElement {
       color: var(--fwc-gold-text);
       font-weight: 700;
     }
+
+    /* ── Match Notifications ────────────────────────────────────────────── */
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+    }
+    .toggle-label {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--fwc-text);
+    }
+    .toggle-sublabel {
+      font-size: 0.75rem;
+      color: var(--fwc-text-muted);
+      margin-top: 2px;
+    }
+
+    /* Switch — the visible affordance for the enable/disable toggle */
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .switch-track {
+      display: block;
+      width: 44px;
+      height: 26px;
+      border-radius: 13px;
+      background: var(--fwc-border);
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .switch-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+    .switch input:checked ~ .switch-track { background: var(--fwc-accent); }
+    .switch input:checked ~ .switch-thumb { transform: translateX(18px); }
+    .switch input:focus-visible ~ .switch-track {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+
+    /* Scope radios */
+    .scope-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .scope-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      cursor: pointer;
+    }
+    .scope-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .radio-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--fwc-border);
+      background: var(--fwc-bg-primary);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.12s;
+    }
+    .radio-dot::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--fwc-accent);
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    .scope-option.is-selected .radio-dot {
+      border-color: var(--fwc-accent);
+    }
+    .scope-option.is-selected .radio-dot::after { opacity: 1; }
+    .scope-option input[type="radio"]:focus-visible ~ .radio-dot {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+    .scope-option-label {
+      font-size: 0.85rem;
+      color: var(--fwc-text);
+    }
+
+    .notif-disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ios-note {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: var(--fwc-text-muted);
+      line-height: 1.5;
+    }
+    .notif-error {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--fwc-text-muted);
+      background: var(--fwc-bg-surface);
+      border: 1px solid var(--fwc-border);
+      border-radius: var(--fwc-radius-sm);
+      padding: 8px 10px;
+    }
   `;
 
   @property({ type: String }) timezone = 'America/New_York';
   @property({ type: Array }) favoriteTeamIds: string[] = [];
+  @property({ type: Boolean }) notificationsEnabled = false;
+  @property({ type: String }) notificationScope: 'favorites' | 'all' = 'favorites';
+
+  /** True while permission request / subscribe call is in flight */
+  @state() private _notifPending = false;
+  /** Non-empty string shown when something goes wrong */
+  @state() private _notifError = '';
+
+  private _isIosBrowser(): boolean {
+    return /iP(hone|ad|od)/.test(navigator.userAgent) && !(window.navigator as Navigator & { standalone?: boolean }).standalone;
+  }
+
+  private async _onNotifToggle(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const enabling = input.checked;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      this._notifError = 'Web Push is not supported in this browser.';
+      return;
+    }
+
+    if (this._isIosBrowser()) {
+      this._notifError = 'On iOS, add this app to your Home Screen first, then enable notifications.';
+      input.checked = !enabling;
+      return;
+    }
+
+    this._notifPending = true;
+    this._notifError   = '';
+
+    try {
+      if (enabling) {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          this._notifError = 'Notification permission was denied. You can re-enable it in your browser settings.';
+          input.checked = false;
+          return;
+        }
+
+        const reg = await navigator.serviceWorker.ready;
+        const vapidKey = (document.querySelector('meta[name="vapid-public-key"]') as HTMLMetaElement | null)?.content ?? '';
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapidKey,
+        });
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: sub.toJSON(),
+            allMatches: this.notificationScope === 'all',
+            favoriteTeamIds: this.favoriteTeamIds,
+          }),
+        });
+
+        this.dispatchEvent(new PreferencesChangedEvent({ notificationsEnabled: true }));
+      } else {
+        // Unsubscribe from push and remove from server
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        this.dispatchEvent(new PreferencesChangedEvent({ notificationsEnabled: false }));
+      }
+    } catch (err) {
+      console.error('[fwc-settings] notification toggle error:', err);
+      this._notifError = 'Something went wrong. Please try again.';
+      input.checked = !enabling;
+    } finally {
+      this._notifPending = false;
+    }
+  }
+
+  private _onScopeChange(scope: 'favorites' | 'all') {
+    this.dispatchEvent(new PreferencesChangedEvent({ notificationScope: scope }));
+
+    // Update the server-side subscription if already subscribed
+    if (this.notificationsEnabled) {
+      navigator.serviceWorker.ready.then(reg =>
+        reg.pushManager.getSubscription()
+      ).then(sub => {
+        if (!sub) return;
+        fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: sub.toJSON(),
+            allMatches: scope === 'all',
+            favoriteTeamIds: this.favoriteTeamIds,
+          }),
+        }).catch(console.error);
+      }).catch(console.error);
+    }
+  }
 
   private _onTimezoneChange(e: Event) {
     const tz = (e.target as HTMLSelectElement).value;
@@ -363,6 +612,71 @@ export class FwcSettings extends LitElement {
             `
             : nothing
           }
+        </div>
+
+        <!-- Match Notifications -->
+        <div class="section">
+          <div class="section-title">Match Notifications</div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Kickoff alerts</div>
+              <div class="toggle-sublabel">Notify me 5 minutes before kickoff</div>
+            </div>
+            <label class="switch" aria-label="Enable kickoff notifications">
+              <input
+                type="checkbox"
+                .checked="${this.notificationsEnabled}"
+                ?disabled="${this._notifPending}"
+                @change="${this._onNotifToggle}"
+              />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="switch-thumb" aria-hidden="true"></span>
+            </label>
+          </div>
+
+          ${this._notifError ? html`
+            <div class="notif-error" role="alert">${this._notifError}</div>
+          ` : nothing}
+
+          <fieldset
+            class="scope-group ${this.notificationsEnabled ? '' : 'notif-disabled'}"
+            ?disabled="${!this.notificationsEnabled}"
+          >
+            <legend class="visually-hidden">Notify me for</legend>
+
+            <label class="scope-option ${this.notificationScope === 'favorites' ? 'is-selected' : ''}">
+              <input
+                type="radio"
+                name="notif-scope"
+                value="favorites"
+                .checked="${this.notificationScope === 'favorites'}"
+                @change="${() => this._onScopeChange('favorites')}"
+              />
+              <span class="radio-dot" aria-hidden="true"></span>
+              <span class="scope-option-label">Favorite teams only</span>
+            </label>
+
+            <label class="scope-option ${this.notificationScope === 'all' ? 'is-selected' : ''}">
+              <input
+                type="radio"
+                name="notif-scope"
+                value="all"
+                .checked="${this.notificationScope === 'all'}"
+                @change="${() => this._onScopeChange('all')}"
+              />
+              <span class="radio-dot" aria-hidden="true"></span>
+              <span class="scope-option-label">All matches</span>
+            </label>
+          </fieldset>
+
+          ${this._isIosBrowser() ? html`
+            <p class="ios-note">
+              <strong>iOS users:</strong> Notifications require adding this app to your
+              Home Screen. Open the Share menu in Safari and tap
+              <em>Add to Home Screen</em>, then return here to enable alerts.
+            </p>
+          ` : nothing}
         </div>
 
         <!-- About -->
