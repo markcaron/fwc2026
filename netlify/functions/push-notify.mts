@@ -192,8 +192,11 @@ export default async function handler(): Promise<Response> {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
   const nowMs = Date.now();
-  const WINDOW_MIN = 4 * 60 * 1000;
-  const WINDOW_MAX = 6 * 60 * 1000;
+  // 4.5–5.5 min window: each match falls inside for exactly one cron run.
+  // A wider window (e.g. 4–6 min) with a 1-min cron would trigger 2–3 sends
+  // per match, burning push quotas and battery.
+  const WINDOW_MIN = 4.5 * 60 * 1000;
+  const WINDOW_MAX = 5.5 * 60 * 1000;
 
   const upcoming = FIXTURES.filter(f => {
     const diff = new Date(f.utc).getTime() - nowMs;
@@ -210,6 +213,11 @@ export default async function handler(): Promise<Response> {
   if (blobs.length === 0) {
     return new Response('No subscribers', { status: 200 });
   }
+
+  // Load all subscriptions once — avoids an N×F Blob read (N subscribers × F fixtures)
+  const allSubs = await Promise.all(
+    blobs.map(b => store.get(b.key, { type: 'json' }) as Promise<StoredSubscription | null>)
+  );
 
   let sent = 0;
   let pruned = 0;
@@ -228,8 +236,8 @@ export default async function handler(): Promise<Response> {
       data:  { matchId: fixture.id },
     });
 
-    for (const blob of blobs) {
-      const sub = await store.get(blob.key, { type: 'json' }) as StoredSubscription | null;
+    for (let i = 0; i < allSubs.length; i++) {
+      const sub = allSubs[i];
       if (!sub) continue;
 
       // Filter: send only if subscriber wants all matches, OR one of their
@@ -254,10 +262,11 @@ export default async function handler(): Promise<Response> {
       } catch (err: unknown) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 410) {
-          // Subscription expired — remove it
-          await store.delete(blob.key);
+          // Subscription expired — remove it and null it out so later fixtures skip it
+          await store.delete(blobs[i].key);
+          allSubs[i] = null;
           pruned++;
-          console.log(`[push-notify] pruned expired subscription ${blob.key.slice(0, 8)}…`);
+          console.log(`[push-notify] pruned expired subscription ${blobs[i].key.slice(0, 8)}…`);
         } else {
           console.error(`[push-notify] send failed (${status}):`, err);
         }

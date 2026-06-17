@@ -623,9 +623,10 @@ export class FwcSettings extends LitElement {
               <div class="toggle-label">Kickoff alerts</div>
               <div class="toggle-sublabel">Notify me 5 minutes before kickoff</div>
             </div>
-            <label class="switch" aria-label="Enable kickoff notifications">
+            <label class="switch">
               <input
                 type="checkbox"
+                aria-label="Enable kickoff notifications"
                 .checked="${this.notificationsEnabled}"
                 ?disabled="${this._notifPending}"
                 @change="${this._onNotifToggle}"

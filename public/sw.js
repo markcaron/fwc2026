@@ -48,15 +48,19 @@ self.addEventListener('activate', (event) => {
 
 // ── Push ───────────────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {};
+  // json() throws SyntaxError on malformed payloads — fall back to defaults
+  let data = {};
+  try { data = event.data?.json() ?? {}; } catch { /* malformed payload */ }
+
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'WC 2026 ⚽', {
-      body:  data.body  ?? 'A match is about to kick off',
-      icon:  '/public/favicon.svg',
-      badge: '/public/favicon.svg',
-      data:  data.data  ?? {},
+      body: data.body ?? 'A match is about to kick off',
+      icon: '/public/favicon.svg',
+      // badge intentionally omitted — SVG is not reliably supported as a
+      // status-bar badge on Android; a dedicated monochrome PNG would be needed
+      data: data.data ?? {},
       // tag deduplicates: a second alert for the same match silently replaces the first
-      tag:   `match-${data.data?.matchId ?? 'unknown'}`,
+      tag:      `match-${data.data?.matchId ?? 'unknown'}`,
       renotify: false,
     })
   );
