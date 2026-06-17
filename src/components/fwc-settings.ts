@@ -256,6 +256,7 @@ export class FwcSettings extends LitElement {
       justify-content: space-between;
       gap: 12px;
       min-height: 44px;
+      cursor: pointer;
     }
     .toggle-label {
       font-size: 0.88rem;
@@ -615,30 +616,36 @@ export class FwcSettings extends LitElement {
         </div>
 
         <!-- Match Notifications -->
-        <div class="section">
+        <div class="section" aria-busy="${this._notifPending ? 'true' : 'false'}">
           <div class="section-title">Match Notifications</div>
 
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label">Kickoff alerts</div>
-              <div class="toggle-sublabel">Notify me 5 minutes before kickoff</div>
-            </div>
-            <label class="switch">
+          <!-- Outer <label> makes the visible text "Kickoff alerts" the
+               accessible name (WCAG 2.5.3) and extends the click target to
+               the full row (WCAG 2.5.5). role="switch" tells AT this is a
+               toggle, not a checkbox. -->
+          <label class="toggle-row">
+            <span>
+              <span class="toggle-label">Kickoff alerts</span>
+              <span class="toggle-sublabel">Notify me 5 minutes before kickoff</span>
+            </span>
+            <span class="switch">
               <input
                 type="checkbox"
-                aria-label="Enable kickoff notifications"
+                role="switch"
                 .checked="${this.notificationsEnabled}"
                 ?disabled="${this._notifPending}"
                 @change="${this._onNotifToggle}"
               />
               <span class="switch-track" aria-hidden="true"></span>
               <span class="switch-thumb" aria-hidden="true"></span>
-            </label>
-          </div>
+            </span>
+          </label>
 
-          ${this._notifError ? html`
-            <div class="notif-error" role="alert">${this._notifError}</div>
-          ` : nothing}
+          <!-- Always in the DOM so JAWS registers the live region before
+               content fires — injecting role="alert" fresh can be missed. -->
+          <div class="notif-error" role="alert" aria-live="assertive" aria-atomic="true">
+            ${this._notifError}
+          </div>
 
           <fieldset
             class="scope-group ${this.notificationsEnabled ? '' : 'notif-disabled'}"
