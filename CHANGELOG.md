@@ -4,6 +4,25 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
+## [1.2.0] — Mexico release — 2026-06-17
+
+### New features
+
+- **Web Push notifications** — Opt-in kickoff alerts delivered 5 minutes before a match starts. Users choose between "Favorite teams only" (default) and "All matches." Powered by VAPID-signed Web Push via a new Netlify scheduled function (`push-notify`) that runs every minute and a subscription CRUD function (`push-subscribe`) backed by Netlify Blobs. On iOS the Settings panel surfaces a prompt to add the app to the Home Screen first, since browser-tab push is unsupported on iOS Safari. ([#31](https://github.com/markcaron/fwc2026/pull/31), closes [#29](https://github.com/markcaron/fwc2026/issues/29))
+- **Update-available toast** — When a new version of the app deploys, a slide-up toast appears at the bottom of the screen with **Dismiss** and **Refresh** actions — replacing the previous silent auto-reload. Respects `prefers-reduced-motion`; manages focus correctly on both paths. ([#32](https://github.com/markcaron/fwc2026/pull/32))
+
+### Bug fixes
+
+- **Favorite team checkboxes not visible on iOS** — The checked state (gold fill, border ring, ✓ checkmark) was invisible on iOS Safari because all three CSS rules used `:has(input:checked)` inside a Shadow Root — a known WebKit bug where `:has` + `:checked` style recalculations are unreliable. Replaced with an `.is-checked` class applied directly in the Lit template. The hidden checkbox is also corrected from the zero-dimension pattern (`width: 0; height: 0`) to the standard visually-hidden technique, and `pointer-events: none` is removed. ([#30](https://github.com/markcaron/fwc2026/pull/30), closes [#28](https://github.com/markcaron/fwc2026/issues/28))
+
+### Accessibility
+
+- **Push notification toggle** — The enable switch uses `role="switch"` (WCAG 4.1.2); the full toggle row is wrapped in a `<label>` so the visible text "Kickoff alerts" is both the click target (WCAG 2.5.5) and the accessible name (WCAG 2.5.3); a persistent light-DOM `role="status"` announcer is registered at boot so JAWS and VoiceOver reliably announce the update state.
+- **Update toast focus management** — Focus shifts to the Dismiss button when the toast appears; Dismiss returns focus to the skip link before removing the toast node (WCAG 2.4.3); Escape key dismisses; interactive buttons moved from `role="status"` (semantically invalid) to `role="region"` with `aria-labelledby`.
+- **Service worker precache resilience** — `cache.addAll()` replaced with `Promise.allSettled()` over individual `cache.add()` calls. `addAll()` is all-or-nothing; a single missing asset (e.g. 404 on deploy) previously aborted the entire SW install.
+
+---
+
 ## [1.1.1] — 2026-06-14
 
 ### Bug fixes
