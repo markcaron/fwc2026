@@ -244,9 +244,100 @@ export class FwcApp extends LitElement {
       padding: 0; margin: -1px;
       overflow: hidden;
       clip: rect(0,0,0,0);
+      clip-path: inset(50%);
       white-space: nowrap;
       border: 0;
     }
+
+    /* ── Update toast ──────────────────────────────────────────── */
+
+    /* translateX(-50%) must be present in every keyframe stop —
+       the toast uses left:50% + translateX(-50%) for centering;
+       omitting it from a stop would cause a horizontal jump */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* Exit drops 8px (vs entry 12px) — smaller offset so the
+       dismissal feels deliberate rather than falling away */
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateX(-50%) translateY(0); }
+      to   { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    }
+
+    .update-toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      width: min(560px, calc(100vw - 32px));
+      background: var(--fwc-bg-raised);
+      color: var(--fwc-text);
+      border: 1px solid var(--fwc-border);
+      border-radius: var(--fwc-radius-md);
+      box-shadow: var(--fwc-shadow-lg);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      font-family: inherit;
+      animation: toast-in 220ms cubic-bezier(0.2, 0, 0, 1) both;
+    }
+
+    .update-toast.toast-dismissing {
+      animation: toast-out 180ms ease-in forwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .update-toast,
+      .update-toast.toast-dismissing { animation: none; }
+    }
+
+    .update-toast svg { flex-shrink: 0; }
+    .update-toast span { flex: 1; }
+
+    .update-toast button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 20px;
+      min-height: 44px;
+      border: 1px solid var(--fwc-border);
+      border-radius: var(--fwc-radius-sm);
+      background: var(--fwc-bg-raised);
+      color: var(--fwc-text);
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .update-toast button:hover { background: var(--fwc-bg-surface); }
+
+    .update-toast button:focus-visible {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+
+    .update-toast .refresh-btn {
+      background: var(--fwc-accent);
+      border-color: var(--fwc-accent);
+      color: var(--fwc-white);
+    }
+
+    .update-toast .refresh-btn:hover { background: var(--fwc-accent-hover); }
+
+    .update-toast .dismiss-btn {
+      background: transparent;
+      border-color: var(--fwc-border);
+      color: var(--fwc-text);
+    }
+
+    .update-toast .dismiss-btn:hover { background: var(--fwc-bg-surface); }
   `;
 
   @state() private _prefs: StoredPreferences = loadPreferences();
@@ -256,6 +347,21 @@ export class FwcApp extends LitElement {
   @state() private _countdown = '';
   /** Cached next match — set once per tick so _renderCountdown doesn't recompute. */
   @state() private _nextMatchCache: Match | null = null;
+  @state() private _updateAvailable = false;
+  @state() private _toastDismissing = false;
+
+  /** SW controller at mount time — used to skip the toast on first-ever install */
+  private _swController: ServiceWorker | null = null;
+  private _swRefreshing = false;
+
+  private _onControllerChange = (): void => {
+    // Ignore the controllerchange that fires when the SW activates for the
+    // very first time (no previous controller) — that's a fresh install, not
+    // an update. Also guard against the event firing twice.
+    if (!this._swController || this._swRefreshing) return;
+    this._swRefreshing = true;
+    this._updateAvailable = true;
+  };
 
   /** Find the next live or upcoming match. Uses a 30-min lookback so a
    *  match that kicked off recently (but hasn't updated to 'live' yet) doesn't
@@ -344,6 +450,11 @@ export class FwcApp extends LitElement {
     this._tick();
     this._tickTimer = setInterval(() => this._tick(), 1000);
     this._startPoll();
+
+    if ('serviceWorker' in navigator) {
+      this._swController = navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', this._onControllerChange);
+    }
   }
 
   override disconnectedCallback(): void {
@@ -351,6 +462,7 @@ export class FwcApp extends LitElement {
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
     if (this._tickTimer !== null) clearInterval(this._tickTimer);
     this._stopPoll();
+    navigator.serviceWorker?.removeEventListener('controllerchange', this._onControllerChange);
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -496,6 +608,24 @@ export class FwcApp extends LitElement {
           </button>
         </div>
       </nav>
+
+      ${this._updateAvailable ? html`
+        <div class="update-toast ${this._toastDismissing ? 'toast-dismissing' : ''}"
+             role="status" aria-live="polite" aria-atomic="true">
+          <svg viewBox="0 0 1200 1200" width="18" height="18" fill="currentColor" aria-hidden="true">
+            <path d="m855.52 688.45c-248.88-56.199-287.43-94.75-343.62-343.62-2.5742-11.375-12.699-19.477-24.398-19.477s-21.824 8.1016-24.398 19.477c-56.227 248.88-94.75 287.43-343.62 343.62-11.398 2.6016-19.5 12.699-19.5 24.398 0 11.699 8.1016 21.801 19.5 24.398 248.88 56.227 287.4 94.773 343.62 343.62 2.5742 11.375 12.699 19.477 24.398 19.477s21.824-8.1016 24.398-19.477c56.227-248.85 94.75-287.4 343.62-343.62 11.398-2.6016 19.477-12.699 19.477-24.398 0-11.699-8.1016-21.801-19.477-24.398z"/>
+            <path d="m1080.5 300.98c-132.3-29.875-150.88-48.449-180.75-180.73-2.6016-11.398-12.699-19.477-24.398-19.477s-21.801 8.0742-24.398 19.477c-29.875 132.27-48.449 150.85-180.73 180.73-11.398 2.6016-19.477 12.699-19.477 24.398s8.0742 21.801 19.477 24.398c132.27 29.875 150.85 48.449 180.73 180.75 2.6016 11.375 12.699 19.477 24.398 19.477s21.801-8.1016 24.398-19.477c29.875-132.3 48.449-150.88 180.75-180.75 11.375-2.6016 19.477-12.699 19.477-24.398s-8.1016-21.801-19.477-24.398z"/>
+          </svg>
+          <span>A new version of the app is available.</span>
+          <button class="dismiss-btn" ?disabled="${this._toastDismissing}"
+                  @click="${() => {
+                    this._toastDismissing = true;
+                    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+                    setTimeout(() => { this._updateAvailable = false; this._toastDismissing = false; }, delay);
+                  }}">Dismiss</button>
+          <button class="refresh-btn" @click="${() => window.location.reload()}">Refresh</button>
+        </div>
+      ` : nothing}
 
       <main class="app-content" id="main-content">
         <div class="tab-panel" id="panel-schedule" role="tabpanel"
