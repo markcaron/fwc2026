@@ -69,10 +69,16 @@ for (const size of [192, 512]) {
 
 // ── 4. Patch index.html ──────────────────────────────────────
 let html = fs.readFileSync('index.html', 'utf8');
+// Swap dev TypeScript entry for the production bundle
 html = html.replace(
   '<script type="module" src="/src/index.ts"></script>',
   '<script type="module" src="/bundle.js"></script>',
 );
+// Inject VAPID public key so fwc-settings can subscribe without an extra fetch.
+// Falls back to an empty string — notifications will fail gracefully if unset.
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY ?? '';
+html = html.replace('VAPID_PUBLIC_KEY_PLACEHOLDER', vapidPublicKey);
+if (!vapidPublicKey) console.warn('⚠ VAPID_PUBLIC_KEY not set — push notifications will be unavailable');
 fs.writeFileSync('dist/index.html', html);
 console.log('✓ Patched index.html → dist/index.html');
 

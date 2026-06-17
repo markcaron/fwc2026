@@ -53,10 +53,12 @@ export interface GroupStanding {
 export interface StoredPreferences {
   timezone: string;           // IANA timezone string
   favoriteTeamIds: string[];  // array of team ids
+  notificationsEnabled: boolean;
+  notificationScope: 'favorites' | 'all';
   schemaVersion: number;
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type TabId = 'schedule' | 'groups' | 'bracket' | 'settings';
 
