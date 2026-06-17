@@ -382,9 +382,7 @@ export class FwcSettings extends LitElement {
     }
 
     .notif-disabled {
-      opacity: 0.5;
-      pointer-events: none;
-      user-select: none;
+      display: none;
     }
     .ios-note {
       margin-top: 8px;
