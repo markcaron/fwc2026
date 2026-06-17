@@ -718,6 +718,8 @@ export class FwcApp extends LitElement {
           <fwc-settings
             .timezone="${prefs.timezone}"
             .favoriteTeamIds="${prefs.favoriteTeamIds}"
+            .notificationsEnabled="${prefs.notificationsEnabled}"
+            .notificationScope="${prefs.notificationScope}"
           ></fwc-settings>
         </div>
       </main>
