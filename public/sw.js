@@ -8,7 +8,7 @@
  *   immediately, which triggers a reload via the controllerchange listener
  *   in index.html.
  * - /api/scores is never cached here — the Netlify function already applies
- *   Cache-Control: s-maxage=30 and the frontend always cache-busts it.
+ *   Cache-Control: s-maxage=30 and the frontend always cache-busts it..
  */
 
 const CACHE_VERSION = '__CACHE_VERSION__'; // replaced by build.mjs
@@ -25,7 +25,12 @@ const PRECACHE = [
 // ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE))
+    // addAll() aborts the entire install if any single request fails (e.g.
+    // /bundle.js doesn't exist in dev). Cache each asset individually so one
+    // missing file doesn't prevent the SW from installing.
+    caches.open(CACHE).then((cache) =>
+      Promise.allSettled(PRECACHE.map((url) => cache.add(url)))
+    )
   );
   // Activate immediately — don't wait for existing clients to close
   self.skipWaiting();
@@ -46,7 +51,40 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// ── Fetch ──────────────────────────────────────────────────────────────────
+// ── Push ───────────────────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  // json() throws SyntaxError on malformed payloads — fall back to defaults
+  let data = {};
+  try { data = event.data?.json() ?? {}; } catch { /* malformed payload */ }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'WC 2026 ⚽', {
+      body: data.body ?? 'A match is about to kick off',
+      icon: '/public/favicon.svg',
+      // badge intentionally omitted — SVG is not reliably supported as a
+      // status-bar badge on Android; a dedicated monochrome PNG would be needed
+      data: data.data ?? {},
+      // tag deduplicates: a second alert for the same match silently replaces the first
+      tag:      `match-${data.data?.matchId ?? 'unknown'}`,
+      renotify: false,
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    // Focus an existing client if one is open, otherwise open a new tab
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        const existing = clients.find((c) => c.url.startsWith(self.location.origin));
+        return existing ? existing.focus() : self.clients.openWindow('/');
+      })
+  );
+});
+
+// ── Fetch ───────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
