@@ -131,6 +131,7 @@ export class FwcSettings extends LitElement {
       clip: rect(0,0,0,0);
       clip-path: inset(50%);
       white-space: nowrap;
+      border: 0;
     }
     /* highlight-ring: navy-500 in light (6.1:1 ✓), gold in dark */
     .team-toggle.is-checked {
