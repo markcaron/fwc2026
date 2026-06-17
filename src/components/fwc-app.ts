@@ -354,6 +354,15 @@ export class FwcApp extends LitElement {
   private _swController: ServiceWorker | null = null;
   private _swRefreshing = false;
 
+  /**
+   * Persistent live-region element appended to document.body.
+   * Live regions must exist in the accessibility tree *before* content is
+   * placed inside them — injecting a role="status" node fresh is missed by
+   * JAWS and VoiceOver/Safari. A light-DOM element also sidesteps Shadow DOM
+   * live-region mapping gaps in those same AT/browser combinations.
+   */
+  private _announcer: HTMLDivElement | null = null;
+
   private _onControllerChange = (): void => {
     // Ignore the controllerchange that fires when the SW activates for the
     // very first time (no previous controller) — that's a fresh install, not
@@ -361,7 +370,33 @@ export class FwcApp extends LitElement {
     if (!this._swController || this._swRefreshing) return;
     this._swRefreshing = true;
     this._updateAvailable = true;
+    if (this._announcer) {
+      this._announcer.textContent =
+        'A new version of the app is available. Use the Refresh button to update.';
+    }
+    // Shift focus to the Dismiss button once Lit has rendered the toast
+    this.updateComplete.then(() => {
+      this.shadowRoot?.querySelector<HTMLElement>('.dismiss-btn')?.focus();
+    });
   };
+
+  /** Dismisses the toast with an optional exit animation and returns focus
+   *  to a stable element before the toast node is removed from the DOM. */
+  private _dismissToast(): void {
+    if (this._toastDismissing) return;
+    this._toastDismissing = true;
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
+    // Return focus before the toast is destroyed — without this the browser
+    // drops focus to document.body, a WCAG 2.4.3 (Focus Order) failure.
+    const returnTarget =
+      this.shadowRoot?.querySelector<HTMLElement>('.skip-link') ??
+      this.shadowRoot?.querySelector<HTMLElement>('#tab-schedule');
+    returnTarget?.focus();
+    setTimeout(() => {
+      this._updateAvailable = false;
+      this._toastDismissing = false;
+    }, delay);
+  }
 
   /** Find the next live or upcoming match. Uses a 30-min lookback so a
    *  match that kicked off recently (but hasn't updated to 'live' yet) doesn't
@@ -455,6 +490,20 @@ export class FwcApp extends LitElement {
       this._swController = navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener('controllerchange', this._onControllerChange);
     }
+
+    // Persistent light-DOM live region — must exist before content is added
+    // so AT registers it as a live region at boot, not at first announcement.
+    const announcer = document.createElement('div');
+    announcer.setAttribute('role', 'status');
+    announcer.setAttribute('aria-live', 'polite');
+    announcer.setAttribute('aria-atomic', 'true');
+    Object.assign(announcer.style, {
+      position: 'absolute', width: '1px', height: '1px',
+      overflow: 'hidden', clip: 'rect(0,0,0,0)', clipPath: 'inset(50%)',
+      whiteSpace: 'nowrap', border: '0',
+    });
+    document.body.appendChild(announcer);
+    this._announcer = announcer;
   }
 
   override disconnectedCallback(): void {
@@ -463,6 +512,8 @@ export class FwcApp extends LitElement {
     if (this._tickTimer !== null) clearInterval(this._tickTimer);
     this._stopPoll();
     navigator.serviceWorker?.removeEventListener('controllerchange', this._onControllerChange);
+    this._announcer?.remove();
+    this._announcer = null;
   }
 
   private _handlePrefsChanged(e: Event) {
@@ -611,19 +662,22 @@ export class FwcApp extends LitElement {
 
       ${this._updateAvailable ? html`
         <div class="update-toast ${this._toastDismissing ? 'toast-dismissing' : ''}"
-             role="status" aria-live="polite" aria-atomic="true">
+             role="region"
+             aria-label="App update notification"
+             aria-labelledby="toast-msg"
+             @keydown="${(e: KeyboardEvent) => { if (e.key === 'Escape') this._dismissToast(); }}">
           <svg viewBox="0 0 1200 1200" width="18" height="18" fill="currentColor" aria-hidden="true">
             <path d="m855.52 688.45c-248.88-56.199-287.43-94.75-343.62-343.62-2.5742-11.375-12.699-19.477-24.398-19.477s-21.824 8.1016-24.398 19.477c-56.227 248.88-94.75 287.43-343.62 343.62-11.398 2.6016-19.5 12.699-19.5 24.398 0 11.699 8.1016 21.801 19.5 24.398 248.88 56.227 287.4 94.773 343.62 343.62 2.5742 11.375 12.699 19.477 24.398 19.477s21.824-8.1016 24.398-19.477c56.227-248.85 94.75-287.4 343.62-343.62 11.398-2.6016 19.477-12.699 19.477-24.398 0-11.699-8.1016-21.801-19.477-24.398z"/>
             <path d="m1080.5 300.98c-132.3-29.875-150.88-48.449-180.75-180.73-2.6016-11.398-12.699-19.477-24.398-19.477s-21.801 8.0742-24.398 19.477c-29.875 132.27-48.449 150.85-180.73 180.73-11.398 2.6016-19.477 12.699-19.477 24.398s8.0742 21.801 19.477 24.398c132.27 29.875 150.85 48.449 180.73 180.75 2.6016 11.375 12.699 19.477 24.398 19.477s21.801-8.1016 24.398-19.477c29.875-132.3 48.449-150.88 180.75-180.75 11.375-2.6016 19.477-12.699 19.477-24.398s-8.1016-21.801-19.477-24.398z"/>
           </svg>
-          <span>A new version of the app is available.</span>
-          <button class="dismiss-btn" ?disabled="${this._toastDismissing}"
-                  @click="${() => {
-                    this._toastDismissing = true;
-                    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180;
-                    setTimeout(() => { this._updateAvailable = false; this._toastDismissing = false; }, delay);
-                  }}">Dismiss</button>
-          <button class="refresh-btn" @click="${() => window.location.reload()}">Refresh</button>
+          <span id="toast-msg">A new version of the app is available.</span>
+          <button class="dismiss-btn"
+                  ?disabled="${this._toastDismissing}"
+                  @click="${() => this._dismissToast()}">Dismiss</button>
+          <button class="refresh-btn"
+                  aria-label="Refresh to apply new version"
+                  ?disabled="${this._toastDismissing}"
+                  @click="${() => window.location.reload()}">Refresh</button>
         </div>
       ` : nothing}
 
