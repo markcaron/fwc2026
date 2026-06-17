@@ -123,12 +123,18 @@ export class FwcSettings extends LitElement {
       /* visually hide checkbox — label handles full-width click target */
       position: absolute;
       opacity: 0;
-      width: 0;
-      height: 0;
-      pointer-events: none;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
     }
     /* highlight-ring: navy-500 in light (6.1:1 ✓), gold in dark */
-    .team-toggle:has(input:checked) {
+    .team-toggle.is-checked {
       background: var(--fwc-bg-raised);
       border-color: var(--fwc-highlight-ring);
       box-shadow: 0 0 0 1px var(--fwc-highlight-ring);
@@ -163,7 +169,7 @@ export class FwcSettings extends LitElement {
      * gold #C9A227 + navy-900 #0a1b2e = 7.83:1 ✓
      * Previous: navy-500 bg + navy-900 stroke ≈ 1.5:1 — failed.
      */
-    .team-toggle:has(input:checked) .toggle-check {
+    .team-toggle.is-checked .toggle-check {
       background: var(--fwc-gold);
       border-color: var(--fwc-gold);
     }
@@ -172,7 +178,7 @@ export class FwcSettings extends LitElement {
       height: 8px;
       display: none;
     }
-    .team-toggle:has(input:checked) .check-mark {
+    .team-toggle.is-checked .check-mark {
       display: block;
     }
 
@@ -233,6 +239,7 @@ export class FwcSettings extends LitElement {
       margin: -1px;
       overflow: hidden;
       clip: rect(0,0,0,0);
+      clip-path: inset(50%);
       white-space: nowrap;
       border: 0;
     }
@@ -330,7 +337,7 @@ export class FwcSettings extends LitElement {
                   const checked = favoriteTeamIds.includes(t.id);
                   return html`
                     <label
-                      class="team-toggle"
+                      class="team-toggle ${checked ? 'is-checked' : ''}"
                       title="${checked ? 'Remove from favorites' : 'Add to favorites'}: ${t.name}"
                     >
                       <input
