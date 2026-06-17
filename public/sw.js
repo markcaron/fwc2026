@@ -8,7 +8,7 @@
  *   immediately, which triggers a reload via the controllerchange listener
  *   in index.html.
  * - /api/scores is never cached here — the Netlify function already applies
- *   Cache-Control: s-maxage=30 and the frontend always cache-busts it.
+ *   Cache-Control: s-maxage=30 and the frontend always cache-busts it..
  */
 
 const CACHE_VERSION = '__CACHE_VERSION__'; // replaced by build.mjs
@@ -25,7 +25,12 @@ const PRECACHE = [
 // ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE))
+    // addAll() aborts the entire install if any single request fails (e.g.
+    // /bundle.js doesn't exist in dev). Cache each asset individually so one
+    // missing file doesn't prevent the SW from installing.
+    caches.open(CACHE).then((cache) =>
+      Promise.allSettled(PRECACHE.map((url) => cache.add(url)))
+    )
   );
   // Activate immediately — don't wait for existing clients to close
   self.skipWaiting();
