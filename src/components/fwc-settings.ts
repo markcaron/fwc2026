@@ -259,11 +259,13 @@ export class FwcSettings extends LitElement {
       cursor: pointer;
     }
     .toggle-label {
+      display: block;
       font-size: 0.88rem;
       font-weight: 600;
       color: var(--fwc-text);
     }
     .toggle-sublabel {
+      display: block;
       font-size: 0.75rem;
       color: var(--fwc-text-muted);
       margin-top: 2px;
@@ -391,6 +393,10 @@ export class FwcSettings extends LitElement {
       line-height: 1.5;
     }
     .notif-error {
+      /* Always in the DOM for reliable AT live-region registration.
+         Visual styles only applied when there is actual error content. */
+    }
+    .notif-error.has-error {
       margin-top: 8px;
       font-size: 0.78rem;
       color: var(--fwc-text-muted);
@@ -645,8 +651,11 @@ export class FwcSettings extends LitElement {
           </label>
 
           <!-- Always in the DOM so JAWS registers the live region before
-               content fires — injecting role="alert" fresh can be missed. -->
-          <div class="notif-error" role="alert" aria-live="assertive" aria-atomic="true">
+               content fires — injecting role="alert" fresh can be missed.
+               Visual styles applied only via .has-error to avoid an empty
+               bordered box when there is no error. -->
+          <div class="notif-error ${this._notifError ? 'has-error' : ''}"
+               role="alert" aria-live="assertive" aria-atomic="true">
             ${this._notifError}
           </div>
 
