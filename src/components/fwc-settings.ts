@@ -321,7 +321,10 @@ export class FwcSettings extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      margin-top: 10px;
+      border: 1px solid var(--fwc-border);
+      border-radius: var(--fwc-radius-md);
+      margin: 10px 0 0;
+      padding: 12px 14px;
     }
     .scope-option {
       display: flex;
