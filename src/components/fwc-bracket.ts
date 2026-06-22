@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { MATCHES, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime } from '../lib/time.js';
 import type { Match } from '../lib/types.js';
@@ -18,30 +18,77 @@ export class FwcBracket extends LitElement {
       padding: 0 12px;
     }
 
-    /* ── Round list view (mobile default) ─────────────────── */
-    .rounds-list { display: flex; flex-direction: column; gap: 0; }
-
-    .round-section {
-      margin-bottom: 2px;
-    }
-
-    .round-header {
-      padding: 10px 16px 6px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--fwc-text-muted);
+    /* ── Round navigation ──────────────────────────────────── */
+    .round-nav {
       display: flex;
       align-items: center;
-      gap: 8px;
+      padding: 8px;
+      min-height: 44px;
     }
-    .round-header.final-round {
-      color: var(--fwc-gold-text);
+
+    .round-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      border-radius: 8px;
+      color: var(--fwc-text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s;
     }
+    .round-arrow:hover:not(:disabled) {
+      background: var(--fwc-bg-surface);
+      color: var(--fwc-text);
+    }
+    .round-arrow:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .round-arrow:focus-visible {
+      outline: var(--fwc-focus-ring);
+      outline-offset: var(--fwc-focus-offset);
+    }
+    .round-arrow svg {
+      width: 7px;
+      height: 12px;
+      flex-shrink: 0;
+    }
+
+    .round-nav-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      min-width: 0;
+    }
+    .round-nav-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+    }
+    .round-nav-label.final-round { color: var(--fwc-gold-text); }
     .round-date {
       font-size: 0.7rem;
       font-weight: 400;
       color: var(--fwc-text-subtle);
-      text-transform: none;
+    }
+
+    /* Visually hidden live region for AT announcements on round change */
+    .nav-announce {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
     }
 
     .match-grid {
@@ -188,6 +235,28 @@ export class FwcBracket extends LitElement {
   @property({ type: String }) timezone = 'America/New_York';
   @property({ type: Array }) favoriteTeamIds: string[] = [];
 
+  /** Index of the currently displayed round */
+  @state() private _activeRoundIdx = 0;
+  /** AT live-region text set on each round change */
+  @state() private _announcement = '';
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Default to the first round that has any non-completed match so the view
+    // opens at the most relevant round during the tournament.
+    const rounds = this._rounds;
+    const idx = rounds.findIndex(r => r.matches.some(m => m.status !== 'completed'));
+    this._activeRoundIdx = idx >= 0 ? idx : rounds.length - 1;
+  }
+
+  private _navigate(delta: 1 | -1): void {
+    const next = this._activeRoundIdx + delta;
+    const rounds = this._rounds;
+    if (next < 0 || next >= rounds.length) return;
+    this._activeRoundIdx = next;
+    this._announcement = rounds[next].label;
+  }
+
   private get _rounds() {
     type RoundDef = { id: string; label: string; matchIds: number[] };
     const defs: RoundDef[] = [
@@ -206,51 +275,86 @@ export class FwcBracket extends LitElement {
 
   render() {
     const rounds = this._rounds;
-    const finalMatch = this.matchData.find(m => m.id === 104);
+    const activeIdx = this._activeRoundIdx;
+    const round = rounds[activeIdx];
+    if (!round) return nothing;
 
-    // Determine champion accounting for penalty shootouts (#8)
+    const canPrev = activeIdx > 0;
+    const canNext = activeIdx < rounds.length - 1;
+    const isFinal = round.id === 'final';
+    const dateRange = round.matches.length > 0 ? this._roundDateRange(round.matches) : '';
+
+    // Determine champion when viewing the Final
     let champion = null;
-    if (finalMatch?.status === 'completed' &&
-        finalMatch.homeScore !== null && finalMatch.awayScore !== null &&
-        finalMatch.homeId && finalMatch.awayId) {
-      const homeWins =
-        finalMatch.homeScore > finalMatch.awayScore ||
-        (finalMatch.homeScore === finalMatch.awayScore &&
-         finalMatch.homePenalty != null &&
-         finalMatch.awayPenalty != null &&
-         finalMatch.homePenalty > finalMatch.awayPenalty);
-      champion = TEAMS_BY_ID.get(homeWins ? finalMatch.homeId : finalMatch.awayId) ?? null;
+    if (isFinal) {
+      const finalMatch = this.matchData.find(m => m.id === 104);
+      if (finalMatch?.status === 'completed' &&
+          finalMatch.homeScore !== null && finalMatch.awayScore !== null &&
+          finalMatch.homeId && finalMatch.awayId) {
+        const homeWins =
+          finalMatch.homeScore > finalMatch.awayScore ||
+          (finalMatch.homeScore === finalMatch.awayScore &&
+           finalMatch.homePenalty != null && finalMatch.awayPenalty != null &&
+           finalMatch.homePenalty > finalMatch.awayPenalty);
+        champion = TEAMS_BY_ID.get(homeWins ? finalMatch.homeId : finalMatch.awayId) ?? null;
+      }
     }
 
     return html`
       <div role="region" aria-label="Knockout bracket">
-        <div class="bracket-scroll">
-          <div class="rounds-list">
-            ${rounds.map(r => html`
-              <section class="round-section" aria-label="${r.label}">
-                <div class="round-header ${r.id === 'final' ? 'final-round' : ''}">
-                  <span>${r.label}</span>
-                  ${r.matches.length > 0
-                    ? html`<span class="round-date">${this._roundDateRange(r.matches)}</span>`
-                    : nothing}
-                </div>
-                <div class="match-grid">
-                  ${r.matches.map(m => this._renderSlot(m, r.id === 'final'))}
-                </div>
-              </section>
-            `)}
 
-            ${champion
-              ? html`
-                <div class="trophy-section" role="status" aria-label="Champion: ${champion.name}">
-                  <div class="trophy-icon" aria-hidden="true">🏆</div>
-                  <div class="trophy-label">World Champion</div>
-                  <div class="trophy-team">${champion.flag} ${champion.name}</div>
-                </div>
-              `
-              : nothing
-            }
+        <!-- Live region for AT announcements on round change -->
+        <div class="nav-announce" aria-live="polite" aria-atomic="true">
+          ${this._announcement}
+        </div>
+
+        <div class="bracket-scroll">
+
+          <!-- Round navigation -->
+          <nav class="round-nav" aria-label="Bracket round navigation">
+            <button
+              class="round-arrow"
+              aria-label="Previous round"
+              ?disabled="${!canPrev}"
+              @click="${() => this._navigate(-1)}"
+            >
+              <svg viewBox="0 0 7 12" fill="none" aria-hidden="true">
+                <path d="M6 1L1 6l5 5" stroke="currentColor" stroke-width="1.5"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
+            <div class="round-nav-content">
+              <span class="round-nav-label ${isFinal ? 'final-round' : ''}">${round.label}</span>
+              ${dateRange ? html`<span class="round-date">${dateRange}</span>` : nothing}
+            </div>
+
+            <button
+              class="round-arrow"
+              aria-label="Next round"
+              ?disabled="${!canNext}"
+              @click="${() => this._navigate(1)}"
+            >
+              <svg viewBox="0 0 7 12" fill="none" aria-hidden="true">
+                <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </nav>
+
+          <!-- Current round matches -->
+          <div class="match-grid" role="list" aria-label="${round.label} matches">
+            ${round.matches.map(m => this._renderSlot(m, isFinal))}
           </div>
+
+          ${champion ? html`
+            <div class="trophy-section" role="status" aria-label="Champion: ${champion.name}">
+              <div class="trophy-icon" aria-hidden="true">🏆</div>
+              <div class="trophy-label">World Champion</div>
+              <div class="trophy-team">${champion.flag} ${champion.name}</div>
+            </div>
+          ` : nothing}
+
         </div>
       </div>
     `;
