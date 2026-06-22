@@ -303,12 +303,10 @@ export default async function handler(): Promise<Response> {
   // ── Pass 2: confirmed knockout team pairings from future dates ────────────
   // The default /scoreboard endpoint only returns today's group-stage matches.
   // Confirmed knockout teams (e.g. Germany, USA, Mexico) only appear when
-  // querying the specific match date via ?dates=YYYYMMDD.
-  // Probe each unique knockout date in the next 7 days so confirmed slots
-  // populate before those matches kick off.
-  // Probe all future knockout dates — no upper cutoff so the full R32/R16/QF/SF/Final
-  // window is always covered regardless of how far out matches fall.
-  // At most ~18 unique dates across the whole tournament; all fetched in parallel.
+  // querying the specific match date via ?dates=YYYYMMDD. Probe all future
+  // knockout dates — no upper cutoff so the full R32/R16/QF/SF/Final window
+  // is always covered. At most ~18 unique dates across the whole tournament;
+  // all fetched in parallel.
   const now = new Date();
   const knockoutDates = new Set<string>();
 
