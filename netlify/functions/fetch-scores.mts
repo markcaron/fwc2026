@@ -306,14 +306,16 @@ export default async function handler(): Promise<Response> {
   // querying the specific match date via ?dates=YYYYMMDD.
   // Probe each unique knockout date in the next 7 days so confirmed slots
   // populate before those matches kick off.
+  // Probe all future knockout dates — no upper cutoff so the full R32/R16/QF/SF/Final
+  // window is always covered regardless of how far out matches fall.
+  // At most ~18 unique dates across the whole tournament; all fetched in parallel.
   const now = new Date();
-  const probeCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const knockoutDates = new Set<string>();
 
   for (const f of FIXTURES) {
     if (f.home !== null && f.away !== null) continue; // skip group-stage fixtures
     const kickoff = new Date(f.utc);
-    if (kickoff > now && kickoff <= probeCutoff) {
+    if (kickoff > now) {
       const y   = kickoff.getUTCFullYear();
       const mon = String(kickoff.getUTCMonth() + 1).padStart(2, '0');
       const day = String(kickoff.getUTCDate()).padStart(2, '0');
