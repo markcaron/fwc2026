@@ -74,25 +74,27 @@ export class FwcBracket extends LitElement {
       align-items: center;
     }
 
+    /* 3-column grid mirrors fwc-match-card: home | centre | away */
     .matchup {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
     }
 
     .team-row {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 7px;
-      padding: 4px 0;
+      gap: 3px;
+      padding: 2px 0;
     }
-    .team-row + .team-row {
-      border-top: 1px solid var(--fwc-border-subtle);
-    }
-    .team-flag { font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+    .team-row.home { align-items: flex-end;   text-align: right; }
+    .team-row.away { align-items: flex-start; text-align: left;  }
+
+    .team-flag { font-size: 1.4rem; line-height: 1; }
     .team-name-bracket {
-      flex: 1;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--fwc-text);
     }
@@ -103,30 +105,53 @@ export class FwcBracket extends LitElement {
     }
     /* gold-text: navy-700 in light (10.5:1 ✓), gold-300 in dark (11.8:1 ✓) */
     .team-name-bracket.favorite { color: var(--fwc-gold-text); }
-    .team-score {
-      font-size: 1rem;
+
+    /* Centre column — time for scheduled, score for live/completed */
+    .slot-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      min-width: 52px;
+    }
+    .slot-score {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 1.2rem;
       font-weight: 700;
-      color: var(--fwc-text);
       font-variant-numeric: tabular-nums;
-      min-width: 16px;
-      text-align: right;
+      color: var(--fwc-text);
+      line-height: 1;
     }
-    .team-score.winner {
-      color: var(--fwc-qualified);
+    .slot-score .winner { color: var(--fwc-qualified); }
+    .score-sep {
+      font-size: 1rem;
+      color: var(--fwc-text-muted);
     }
-    /* gold-text: AA-safe gold equivalent for text on card backgrounds */
-    .team-time {
+    .slot-final {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+      background: var(--fwc-bg-surface);
+      border: 1px solid var(--fwc-border);
+      border-radius: 20px;
+      padding: 1px 6px;
+      margin-top: 2px;
+    }
+    .slot-pens {
+      font-size: 0.65rem;
+      color: var(--fwc-text-muted);
+    }
+    .slot-vs {
       font-size: 0.72rem;
+      color: var(--fwc-text-muted);
+    }
+    /* gold-text token: AA-safe gold equivalent for text on card backgrounds */
+    .team-time {
+      font-size: 0.78rem;
       font-weight: 600;
       color: var(--fwc-gold-text);
-    }
-    /* Shared kick-off time row — appears once between home and away (#16) */
-    .slot-time-row {
-      justify-content: center;
-      border-top: 1px solid var(--fwc-border-subtle);
-      border-bottom: 1px solid var(--fwc-border-subtle);
-      padding: 3px 0;
-      margin: 1px 0;
     }
 
     .venue-line {
@@ -272,8 +297,8 @@ export class FwcBracket extends LitElement {
         </div>
 
         <div class="matchup">
-          <!-- Home / top team -->
-          <div class="team-row">
+          <!-- Home team (right-aligned) -->
+          <div class="team-row home">
             ${home
               ? html`<span class="team-flag" role="img" aria-label="${home.name} flag">${home.flag}</span>`
               : html`<span class="team-flag" aria-hidden="true">🏳</span>`
@@ -281,21 +306,33 @@ export class FwcBracket extends LitElement {
             <span class="team-name-bracket ${home ? (homeIsFav ? 'favorite' : '') : 'tbd'}">
               ${home?.shortName ?? match.homeLabel ?? 'TBD'}
             </span>
-            ${hasScore
-              ? html`<span class="team-score ${homeWon ? 'winner' : ''}" aria-label="Score: ${match.homeScore}">${match.homeScore}</span>`
-              : nothing
-            }
           </div>
 
-          <!-- Kick-off time shown once between teams for scheduled matches -->
-          ${!hasScore ? html`
-            <div class="team-row slot-time-row" aria-hidden="true">
-              <span class="team-time">${fmt.time}</span>
-            </div>
-          ` : nothing}
+          <!-- Centre: score for live/completed, time + vs for scheduled -->
+          <div class="slot-center">
+            ${hasScore ? html`
+              <div class="slot-score" aria-label="${home?.name ?? 'Home'} ${match.homeScore} – ${match.awayScore} ${away?.name ?? 'Away'}">
+                <span class="${homeWon ? 'winner' : ''}">${match.homeScore}</span>
+                <span class="score-sep" aria-hidden="true">–</span>
+                <span class="${awayWon ? 'winner' : ''}">${match.awayScore}</span>
+              </div>
+              ${isFinished
+                ? html`<div class="slot-final" aria-label="Full time">Final</div>`
+                : nothing
+              }
+              ${match.homePenalty != null ? html`
+                <div class="slot-pens" aria-label="Penalties: ${match.homePenalty}–${match.awayPenalty}">
+                  (${match.homePenalty}–${match.awayPenalty} pens)
+                </div>
+              ` : nothing}
+            ` : html`
+              <span class="team-time" aria-hidden="true">${fmt.time}</span>
+              <span class="slot-vs" aria-hidden="true">vs</span>
+            `}
+          </div>
 
-          <!-- Away / bottom team -->
-          <div class="team-row">
+          <!-- Away team (left-aligned) -->
+          <div class="team-row away">
             ${away
               ? html`<span class="team-flag" role="img" aria-label="${away.name} flag">${away.flag}</span>`
               : html`<span class="team-flag" aria-hidden="true">🏳</span>`
@@ -303,10 +340,6 @@ export class FwcBracket extends LitElement {
             <span class="team-name-bracket ${away ? (awayIsFav ? 'favorite' : '') : 'tbd'}">
               ${away?.shortName ?? match.awayLabel ?? 'TBD'}
             </span>
-            ${hasScore
-              ? html`<span class="team-score ${awayWon ? 'winner' : ''}" aria-label="Score: ${match.awayScore}">${match.awayScore}</span>`
-              : nothing
-            }
           </div>
         </div>
 
