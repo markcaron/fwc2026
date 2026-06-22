@@ -4,6 +4,16 @@ import { MATCHES, TEAMS_BY_ID } from '../lib/data.js';
 import { formatMatchTime } from '../lib/time.js';
 import type { Match } from '../lib/types.js';
 
+// ── Bracket progression — which two match-IDs feed the same next-round slot ──
+// Pairs are listed in display order (top → bottom within each round).
+const BRACKET_PAIRS: Partial<Record<string, [number, number][]>> = {
+  r32: [[74,77],[73,75],[76,78],[79,80],[83,84],[81,82],[86,88],[85,87]],
+  r16: [[89,90],[93,94],[91,92],[95,96]],
+  qf:  [[97,98],[99,100]],
+  sf:  [[101,102]],
+  // '3rd' and 'final' are single matches — no pairing needed
+};
+
 @customElement('fwc-bracket')
 export class FwcBracket extends LitElement {
   static styles = css`
@@ -15,7 +25,7 @@ export class FwcBracket extends LitElement {
     .bracket-scroll {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      padding: 0 12px;
+      padding: 0 12px 16px; /* bottom padding prevents shadow clipping from overflow-x: auto */
     }
 
     /* ── Round navigation ──────────────────────────────────── */
@@ -97,6 +107,74 @@ export class FwcBracket extends LitElement {
       gap: 8px;
       padding: 0 12px;
     }
+
+    /* ── Bracket pair grouping ─────────────────────────────── */
+    .bracket-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      padding: 0 32px 0 12px; /* extra right padding gives room for the outward stub */
+    }
+    .bracket-group {
+      display: flex;
+      align-items: stretch;
+    }
+    .bracket-group-matches {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+    .bracket-groups[data-round="r16"] { --bracket-inner-gap: 16px;  }
+    .bracket-groups[data-round="qf"]  { --bracket-inner-gap: 16px; }
+    .bracket-groups[data-round="sf"]  { --bracket-inner-gap: 16px; }
+
+    /* Right-side brace — top and bottom arms meeting at a midpoint.
+       ::after creates the stub that extends RIGHTWARD beyond the brace edge. */
+    .bracket-connector {
+      width: 16px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      position: relative;
+    }
+    .bracket-connector::after {
+      content: '';
+      position: absolute;
+      left: 14px;          /* flush with the right-border of the brace */
+      top: calc(50% - 1px);
+      width: 18px;         /* stub extends rightward past the brace edge */
+      height: 2px;
+      background: var(--fwc-border-subtle);
+    }
+    .bc-top {
+      flex: 1;
+      border-right: 2px solid var(--fwc-border-subtle);
+      border-top: 2px solid var(--fwc-border-subtle);
+      border-top-right-radius: 4px;
+    }
+    .bc-bottom {
+      flex: 1;
+      border-right: 2px solid var(--fwc-border-subtle);
+      border-bottom: 2px solid var(--fwc-border-subtle);
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Left intake arm — short horizontal line entering each R16+ card from the left */
+    .intake-arm {
+      width: 20px;
+      flex-shrink: 0;
+      align-self: center;
+      height: 0;
+      border-top: 2px solid var(--fwc-border-subtle);
+    }
+    .slot-with-intake {
+      display: flex;
+      align-items: stretch;
+    }
+    .slot-with-intake .slot { flex: 1; min-width: 0; }
 
     /* ── Match slot card ───────────────────────────────────── */
     .slot {
@@ -207,6 +285,49 @@ export class FwcBracket extends LitElement {
       margin-top: 5px;
     }
 
+    /* ── Finals combined page ──────────────────────────────── */
+    .finals-page {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 12px 16px;
+    }
+    .finals-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .finals-section-label {
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--fwc-text-muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .finals-divider {
+      height: 1px;
+      background: var(--fwc-border-subtle);
+      margin: 8px 0;
+    }
+
+    /* Final section — gold label + intake arm from SF */
+    .finals-final-label {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--fwc-gold-text);
+      letter-spacing: 0.02em;
+    }
+    .finals-match-row {
+      display: flex;
+      align-items: center;
+    }
+    .finals-match-row .slot {
+      flex: 1;
+      min-width: 0;
+    }
+
     /* ── Trophy ─────────────────────────── */
     .trophy-section {
       display: flex;
@@ -260,12 +381,11 @@ export class FwcBracket extends LitElement {
   private get _rounds() {
     type RoundDef = { id: string; label: string; matchIds: number[] };
     const defs: RoundDef[] = [
-      { id: 'r32',   label: 'Round of 32',         matchIds: [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88] },
-      { id: 'r16',   label: 'Round of 16',          matchIds: [89,90,91,92,93,94,95,96] },
-      { id: 'qf',    label: 'Quarterfinals',         matchIds: [97,98,99,100] },
-      { id: 'sf',    label: 'Semifinals',            matchIds: [101,102] },
-      { id: '3rd',   label: 'Third-Place Play-off',  matchIds: [103] },
-      { id: 'final', label: 'Final',                 matchIds: [104] },
+      { id: 'r32',    label: 'Round of 32',         matchIds: [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88] },
+      { id: 'r16',    label: 'Round of 16',          matchIds: [89,90,91,92,93,94,95,96] },
+      { id: 'qf',     label: 'Quarterfinals',         matchIds: [97,98,99,100] },
+      { id: 'sf',     label: 'Semifinals',            matchIds: [101,102] },
+      { id: 'finals', label: 'Finals',                matchIds: [103,104] },
     ];
     return defs.map(d => ({
       ...d,
@@ -281,12 +401,13 @@ export class FwcBracket extends LitElement {
 
     const canPrev = activeIdx > 0;
     const canNext = activeIdx < rounds.length - 1;
-    const isFinal = round.id === 'final';
+    const isFinals = round.id === 'finals';
+    const isFinal = round.id === 'final' || isFinals;
     const dateRange = round.matches.length > 0 ? this._roundDateRange(round.matches) : '';
 
-    // Determine champion when viewing the Final
+    // Determine champion when on the Finals page
     let champion = null;
-    if (isFinal) {
+    if (isFinals) {
       const finalMatch = this.matchData.find(m => m.id === 104);
       if (finalMatch?.status === 'completed' &&
           finalMatch.homeScore !== null && finalMatch.awayScore !== null &&
@@ -342,20 +463,97 @@ export class FwcBracket extends LitElement {
             </button>
           </nav>
 
-          <!-- Current round matches -->
-          <div class="match-grid" role="list" aria-label="${round.label} matches">
-            ${round.matches.map(m => this._renderSlot(m, isFinal))}
-          </div>
-
-          ${champion ? html`
-            <div class="trophy-section" role="status" aria-label="Champion: ${champion.name}">
-              <div class="trophy-icon" aria-hidden="true">🏆</div>
-              <div class="trophy-label">World Champion</div>
-              <div class="trophy-team">${champion.flag} ${champion.name}</div>
-            </div>
-          ` : nothing}
+          <!-- Current round matches — paired with bracket connectors if applicable -->
+          ${isFinals
+            ? this._renderFinalsPage(round.matches, champion)
+            : BRACKET_PAIRS[round.id]
+              ? this._renderPaired(round.matches, BRACKET_PAIRS[round.id]!, isFinal, round.id)
+              : html`
+                <div class="match-grid" role="list" aria-label="${round.label} matches">
+                  ${round.matches.map(m => this._renderSlot(m, isFinal))}
+                </div>
+              `
+          }
 
         </div>
+      </div>
+    `;
+  }
+
+  private _renderFinalsPage(matches: Match[], champion: { name: string; flag: string } | null) {
+    const thirdPlace = matches.find(m => m.id === 103);
+    const finalMatch = matches.find(m => m.id === 104);
+    return html`
+      <div class="finals-page">
+
+        <!-- Third-Place Play-off -->
+        ${thirdPlace ? html`
+          <div class="finals-section" role="region" aria-label="Third-Place Play-off">
+            <div class="finals-section-label">Third-Place Play-off</div>
+            <div class="finals-match-row">
+              <div class="intake-arm" aria-hidden="true"></div>
+              ${this._renderSlot(thirdPlace, false)}
+            </div>
+          </div>
+        ` : nothing}
+
+        <div class="finals-divider" aria-hidden="true"></div>
+
+        <!-- Final -->
+        ${finalMatch ? html`
+          <div class="finals-section" role="region" aria-label="Final">
+            <div class="finals-section-label finals-final-label">🏆 Final</div>
+            <div class="finals-match-row">
+              <div class="intake-arm" aria-hidden="true"></div>
+              ${this._renderSlot(finalMatch, true)}
+            </div>
+          </div>
+        ` : nothing}
+
+        ${champion ? html`
+          <div class="trophy-section" role="status" aria-label="Champion: ${champion.name}">
+            <div class="trophy-icon" aria-hidden="true">🏆</div>
+            <div class="trophy-label">World Champion</div>
+            <div class="trophy-team">${champion.flag} ${champion.name}</div>
+          </div>
+        ` : nothing}
+
+      </div>
+    `;
+  }
+
+  private _renderPaired(matches: Match[], pairs: [number, number][], isFinal: boolean, roundId: string) {
+    const byId = new Map(matches.map(m => [m.id, m]));
+    const hasIntakeArm = roundId !== 'r32';
+    return html`
+      <div class="bracket-groups" data-round="${roundId}" role="list" aria-label="Matches">
+        ${pairs.map(([aId, bId]) => {
+          const a = byId.get(aId);
+          const b = byId.get(bId);
+          return html`
+            <div class="bracket-group" role="listitem">
+              <div class="bracket-group-matches">
+                ${a ? html`
+                  <div class="slot-with-intake">
+                    ${hasIntakeArm ? html`<div class="intake-arm" aria-hidden="true"></div>` : nothing}
+                    ${this._renderSlot(a, isFinal)}
+                  </div>
+                ` : nothing}
+                ${b ? html`
+                  <div class="slot-with-intake">
+                    ${hasIntakeArm ? html`<div class="intake-arm" aria-hidden="true"></div>` : nothing}
+                    ${this._renderSlot(b, isFinal)}
+                  </div>
+                ` : nothing}
+              </div>
+              <!-- Right brace with rightward stub at midpoint via ::after -->
+              <div class="bracket-connector" aria-hidden="true">
+                <div class="bc-top"></div>
+                <div class="bc-bottom"></div>
+              </div>
+            </div>
+          `;
+        })}
       </div>
     `;
   }
