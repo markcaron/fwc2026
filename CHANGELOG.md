@@ -4,6 +4,14 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
+## [1.3.1] — 2026-06-22
+
+### Bug fixes
+
+- **USA, Mexico and other confirmed R32 teams not appearing in bracket** — The knockout date probe had a 7-day upper cutoff. USA's match (July 1) is 9 days out; Mexico's (June 30) is 8 days. Removed the cutoff entirely so all future knockout fixture dates are always probed. At most ~18 unique dates across the full bracket, all fetched in parallel, so runtime cost is unchanged. ([#37](https://github.com/markcaron/fwc2026/pull/37))
+
+---
+
 ## [1.3.0] — Argentina release — 2026-06-22
 
 ### New features
