@@ -4,6 +4,26 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
+## [1.3.0] — Argentina release — 2026-06-22
+
+### New features
+
+- **Knockout bracket navigation** — The Knockouts tab now shows one round at a time with ← / → arrow navigation (matching the schedule's day-navigation pattern). The view auto-opens at the most relevant round — the first with any non-completed match. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+- **Bracket connector lines** — Paired matches (two that feed the same next-round slot) are visually grouped with a right-side brace connector (`┌─ ├── └─`) whose midpoint stub points outward. R16+ cards show a left intake arm (`──►`) indicating they were produced by the prior round. Pairs are 16px apart; groups 40px apart. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+- **Combined Finals page** — Third-Place Play-off and Final appear together on a single special page. The Final shows a gold `🏆 Final` label and highlight border; both cards carry SF intake arms; the champion trophy appears below once the Final completes. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+- **Confirmed knockout teams from ESPN** — The `fetch-scores` cron now probes upcoming knockout match dates (next 7 days, in parallel) via the ESPN dated scoreboard API. Confirmed teams (e.g. Germany, USA, Mexico) populate the bracket automatically within the next cron run (every 5 min), even before kickoff. Partial resolution is supported — one confirmed team displays while the other slot stays TBD. ([#35](https://github.com/markcaron/fwc2026/pull/35), closes [#34](https://github.com/markcaron/fwc2026/issues/34))
+
+### Enhancements
+
+- **Bracket match card redesign** — Knockout slots now use the same `1fr auto 1fr` grid as schedule cards: home team right-aligned, score/time centred, away team left-aligned. Eliminates the double border that appeared above the away row. Card padding updated to `16px 20px` to match schedule cards. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+
+### Bug fixes
+
+- **Knockout match shadow clipping** — `overflow-x: auto` on the bracket scroll container was clipping card drop-shadows. Fixed with `padding-bottom` on the scroll wrapper. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+- **Confirmed knockout teams incorrectly marked completed** — `applyScores` was defaulting `status` to `'completed'` when no status field was present in a score entry. Scheduled knockout matches with ESPN-confirmed team IDs (but no score yet) were silently skipped by the countdown timer. Fixed to fall back to the static match status. ([#35](https://github.com/markcaron/fwc2026/pull/35))
+
+---
+
 ## [1.2.0] — Mexico release — 2026-06-17
 
 ### New features

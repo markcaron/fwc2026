@@ -16,6 +16,10 @@ export interface ScoreEntry {
   status?:       'live' | 'completed';
   homePenalty?:  number;
   awayPenalty?:  number;
+  /** Resolved team IDs for knockout slots — written when ESPN confirms the
+   *  pairing in a scheduled (pre-state) event before the match kicks off. */
+  homeId?:       string;
+  awayId?:       string;
 }
 
 /**
@@ -79,9 +83,13 @@ export function applyScores(
       ...m,
       homeScore:    s.home    ?? null,  // null when score not yet available (live)
       awayScore:    s.away    ?? null,
-      status:       s.status  ?? 'completed',
+      status:       s.status  ?? m.status,
       homePenalty:  s.homePenalty ?? null,
       awayPenalty:  s.awayPenalty ?? null,
+      // Overlay confirmed knockout team IDs when present; fall back to the
+      // static value (null for group-stage TBD slots, team id for group matches)
+      homeId:       s.homeId  ?? m.homeId,
+      awayId:       s.awayId  ?? m.awayId,
     };
   });
 }
