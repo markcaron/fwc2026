@@ -83,7 +83,7 @@ export function applyScores(
       ...m,
       homeScore:    s.home    ?? null,  // null when score not yet available (live)
       awayScore:    s.away    ?? null,
-      status:       s.status  ?? 'completed',
+      status:       s.status  ?? m.status,
       homePenalty:  s.homePenalty ?? null,
       awayPenalty:  s.awayPenalty ?? null,
       // Overlay confirmed knockout team IDs when present; fall back to the

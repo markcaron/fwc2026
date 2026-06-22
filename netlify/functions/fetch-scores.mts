@@ -321,23 +321,26 @@ export default async function handler(): Promise<Response> {
     }
   }
 
-  for (const dateStr of knockoutDates) {
-    let dateEvents: ESPNEvent[];
-    try {
+  // Probe all upcoming knockout dates in parallel — sequential awaits could
+  // approach the function timeout during rounds with 3–5 distinct match dates
+  const probeResults = await Promise.allSettled(
+    [...knockoutDates].map(async dateStr => {
       const res = await fetch(
         `https://site.web.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=50&dates=${dateStr}`,
         { signal: AbortSignal.timeout(8000) },
       );
-      if (!res.ok) {
-        console.warn(`[fetch-scores] knockout probe ${dateStr}: ${res.status}`);
-        continue;
-      }
+      if (!res.ok) throw new Error(`${res.status}`);
       const data = (await res.json()) as { events?: ESPNEvent[] };
-      dateEvents = data.events ?? [];
-    } catch (err) {
-      console.warn(`[fetch-scores] knockout probe ${dateStr} failed:`, err);
+      return { dateStr, events: data.events ?? [] };
+    })
+  );
+
+  for (const result of probeResults) {
+    if (result.status === 'rejected') {
+      console.warn(`[fetch-scores] knockout probe failed:`, result.reason);
       continue;
     }
+    const { dateStr, events: dateEvents } = result.value;
 
     for (const evt of dateEvents) {
       const comp = evt.competitions[0];
@@ -365,7 +368,7 @@ export default async function handler(): Promise<Response> {
       }
 
       if (ourId === undefined) {
-        console.warn(`[fetch-scores] knockout probe: no match @ ${evt.date}`);
+        console.warn(`[fetch-scores] knockout probe ${dateStr}: no match @ ${evt.date}`);
         continue;
       }
 

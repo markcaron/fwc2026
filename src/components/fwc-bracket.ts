@@ -368,6 +368,7 @@ export class FwcBracket extends LitElement {
     const rounds = this._rounds;
     const idx = rounds.findIndex(r => r.matches.some(m => m.status !== 'completed'));
     this._activeRoundIdx = idx >= 0 ? idx : rounds.length - 1;
+    this._announcement = rounds[this._activeRoundIdx].label;
   }
 
   private _navigate(delta: 1 | -1): void {
@@ -402,7 +403,7 @@ export class FwcBracket extends LitElement {
     const canPrev = activeIdx > 0;
     const canNext = activeIdx < rounds.length - 1;
     const isFinals = round.id === 'finals';
-    const isFinal = round.id === 'final' || isFinals;
+    const isFinal = isFinals;
     const dateRange = round.matches.length > 0 ? this._roundDateRange(round.matches) : '';
 
     // Determine champion when on the Finals page
