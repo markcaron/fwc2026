@@ -249,10 +249,12 @@ export default async function handler(): Promise<Response> {
   }
 
   const newScores: Record<string, {
-    home?: number; away?: number; status: string;
+    home?: number; away?: number; status?: string;
     homePenalty?: number; awayPenalty?: number;
+    homeId?: string; awayId?: string;
   }> = {};
 
+  // ── Pass 1: live / completed scores from today's feed ─────────────────────
   for (const evt of events) {
     const comp   = evt.competitions[0];
     const state  = comp.status.type.state;      // 'pre' | 'in' | 'post'
@@ -296,6 +298,90 @@ export default async function handler(): Promise<Response> {
     }
 
     newScores[String(ourId)] = entry;
+  }
+
+  // ── Pass 2: confirmed knockout team pairings from future dates ────────────
+  // The default /scoreboard endpoint only returns today's group-stage matches.
+  // Confirmed knockout teams (e.g. Germany, USA, Mexico) only appear when
+  // querying the specific match date via ?dates=YYYYMMDD.
+  // Probe each unique knockout date in the next 7 days so confirmed slots
+  // populate before those matches kick off.
+  const now = new Date();
+  const probeCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const knockoutDates = new Set<string>();
+
+  for (const f of FIXTURES) {
+    if (f.home !== null && f.away !== null) continue; // skip group-stage fixtures
+    const kickoff = new Date(f.utc);
+    if (kickoff > now && kickoff <= probeCutoff) {
+      const y   = kickoff.getUTCFullYear();
+      const mon = String(kickoff.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(kickoff.getUTCDate()).padStart(2, '0');
+      knockoutDates.add(`${y}${mon}${day}`);
+    }
+  }
+
+  // Probe all upcoming knockout dates in parallel — sequential awaits could
+  // approach the function timeout during rounds with 3–5 distinct match dates
+  const probeResults = await Promise.allSettled(
+    [...knockoutDates].map(async dateStr => {
+      const res = await fetch(
+        `https://site.web.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=50&dates=${dateStr}`,
+        { signal: AbortSignal.timeout(8000) },
+      );
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = (await res.json()) as { events?: ESPNEvent[] };
+      return { dateStr, events: data.events ?? [] };
+    })
+  );
+
+  for (const result of probeResults) {
+    if (result.status === 'rejected') {
+      console.warn(`[fetch-scores] knockout probe failed:`, result.reason);
+      continue;
+    }
+    const { dateStr, events: dateEvents } = result.value;
+
+    for (const evt of dateEvents) {
+      const comp = evt.competitions[0];
+      if (comp.status.type.state !== 'pre') continue;
+
+      const homeC = comp.competitors.find(c => c.homeAway === 'home');
+      const awayC = comp.competitors.find(c => c.homeAway === 'away');
+      if (!homeC || !awayC) continue;
+
+      const hAbb = homeC.team.abbreviation?.toUpperCase();
+      const aAbb = awayC.team.abbreviation?.toUpperCase();
+      const hId  = TEAM_BY_ABB[hAbb];
+      const aId  = TEAM_BY_ABB[aAbb];
+
+      // Skip if neither team resolves — pure slot labels like '2A', '3RD'
+      if (!hId && !aId) continue;
+
+      // Knockout fixtures always matched by UTC time (homeId/awayId are null
+      // in our fixture table, so BY_TEAMS won't find them)
+      const evtMin = Math.round(new Date(evt.date).getTime() / 60000);
+      let ourId: number | undefined;
+      for (let d = 0; d <= 10; d++) {
+        ourId = BY_TIME.get(evtMin + d) ?? BY_TIME.get(evtMin - d);
+        if (ourId !== undefined) break;
+      }
+
+      if (ourId === undefined) {
+        console.warn(`[fetch-scores] knockout probe ${dateStr}: no match @ ${evt.date}`);
+        continue;
+      }
+
+      // Write whichever team(s) are confirmed; the other slot stays null (TBD)
+      // until ESPN confirms that team. Partial resolution is intentional.
+      const existing = newScores[String(ourId)] ?? {};
+      newScores[String(ourId)] = {
+        ...existing,
+        ...(hId ? { homeId: hId } : {}),
+        ...(aId ? { awayId: aId } : {}),
+      };
+      console.log(`[fetch-scores] knockout slot match ${ourId}: home=${hId ?? 'TBD'} away=${aId ?? 'TBD'}`);
+    }
   }
 
   // Merge with existing Blobs data so past results are never lost
