@@ -56,7 +56,7 @@ export class FwcBracket extends LitElement {
       background: var(--fwc-bg-primary);
       border: 1px solid var(--fwc-border);
       border-radius: var(--fwc-radius-md);
-      padding: 10px 12px;
+      padding: 16px 20px;
       box-shadow: var(--fwc-shadow-sm);
     }
     /* highlight-ring: navy-500 in light (6.1:1 ✓), gold in dark */
