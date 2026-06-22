@@ -249,8 +249,9 @@ export default async function handler(): Promise<Response> {
   }
 
   const newScores: Record<string, {
-    home?: number; away?: number; status: string;
+    home?: number; away?: number; status?: string;
     homePenalty?: number; awayPenalty?: number;
+    homeId?: string; awayId?: string;
   }> = {};
 
   for (const evt of events) {
@@ -258,8 +259,9 @@ export default async function handler(): Promise<Response> {
     const state  = comp.status.type.state;      // 'pre' | 'in' | 'post'
     const isLive = state === 'in';
     const isDone = state === 'post';
+    const isPre  = state === 'pre';
 
-    if (!isLive && !isDone) continue;
+    if (!isLive && !isDone && !isPre) continue;
 
     // Get home/away teams by homeAway field (don't assume array order)
     const homeC = comp.competitors.find(c => c.homeAway === 'home');
@@ -283,6 +285,18 @@ export default async function handler(): Promise<Response> {
 
     if (ourId === undefined) {
       console.warn(`[fetch-scores] no match found: ${hAbb} vs ${aAbb} @ ${evt.date}`);
+      continue;
+    }
+
+    // Scheduled (pre) events: persist confirmed team IDs for knockout slots.
+    // Only write when BOTH abbreviations resolve — guards against ESPN returning
+    // placeholder/unknown entries before the bracket is officially confirmed.
+    if (isPre) {
+      if (hId && aId) {
+        const existing = newScores[String(ourId)] ?? {};
+        newScores[String(ourId)] = { ...existing, homeId: hId, awayId: aId };
+        console.log(`[fetch-scores] knockout slot confirmed: ${hId} vs ${aId} (match ${ourId})`);
+      }
       continue;
     }
 
