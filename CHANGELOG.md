@@ -8,7 +8,8 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ### Bug fixes
 
-- **Team names disappearing from bracket and schedule when R32 matches kick off** — Once Round of 32 matches went live, Pass 1 of the score cron wrote score entries without `homeId`/`awayId`. The final Blob merge was a shallow object spread that replaced the entire entry, silently discarding the team IDs that Pass 2 had written before kickoff. Fixed with two complementary changes: (1) the final merge is now a deep per-entry merge so existing team IDs survive when a new entry only carries scores/status; (2) Pass 1 also writes `homeId`/`awayId` when it resolves them, making entries self-contained. ([#38](https://github.com/markcaron/fwc2026/pull/38))
+- **Team names disappearing from bracket and schedule when R32 matches kick off** — Once Round of 32 matches went live, Pass 1 of the score cron wrote score entries without `homeId`/`awayId`. The final Blob merge was a shallow object spread that replaced the entire entry, silently discarding the team IDs that Pass 2 had written before kickoff. Fixed with a deep per-entry merge so existing team IDs survive when a new entry only carries scores/status; Pass 1 now also writes team IDs when it resolves them. ([#38](https://github.com/markcaron/fwc2026/pull/38))
+- **Yesterday's R32 matches still showing slot labels (e.g. "Group A Runner-Up") after teams confirmed** — Pass 2 only queried future knockout dates, so matches that had already been played dropped out of the probe window. A fixed lookback window (e.g. 3 days) would have broken again in a week. Pass 2 now probes every knockout fixture date regardless of how far in the past or future — all 18 dates in parallel. With the deep-merge Blob write in place, re-querying already-resolved dates is a no-op. ([#40](https://github.com/markcaron/fwc2026/pull/40))
 
 ---
 
