@@ -306,24 +306,21 @@ export default async function handler(): Promise<Response> {
   }
 
   // ── Pass 2: confirmed knockout team pairings from future dates ────────────
-  // The default /scoreboard endpoint only returns today's group-stage matches.
-  // Confirmed knockout teams (e.g. Germany, USA, Mexico) only appear when
-  // querying the specific match date via ?dates=YYYYMMDD. Probe all future
-  // knockout dates — no upper cutoff so the full R32/R16/QF/SF/Final window
-  // is always covered. At most ~18 unique dates across the whole tournament;
-  // all fetched in parallel.
-  const now = new Date();
+  // Probe all knockout fixture dates — both past and future. Past dates catch
+  // recently-played matches whose teams weren't resolved at kickoff time.
+  // Future dates capture confirmed teams before kickoff.
+  // With the deep-merge Blob write, team IDs written for any date are preserved
+  // permanently; re-querying an already-resolved date is a cheap no-op.
+  // At most ~18 unique dates across the whole tournament; all fetched in parallel.
   const knockoutDates = new Set<string>();
 
   for (const f of FIXTURES) {
     if (f.home !== null && f.away !== null) continue; // skip group-stage fixtures
     const kickoff = new Date(f.utc);
-    if (kickoff > now) {
-      const y   = kickoff.getUTCFullYear();
-      const mon = String(kickoff.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(kickoff.getUTCDate()).padStart(2, '0');
-      knockoutDates.add(`${y}${mon}${day}`);
-    }
+    const y   = kickoff.getUTCFullYear();
+    const mon = String(kickoff.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(kickoff.getUTCDate()).padStart(2, '0');
+    knockoutDates.add(`${y}${mon}${day}`);
   }
 
   // Probe all upcoming knockout dates in parallel — sequential awaits could
@@ -349,7 +346,10 @@ export default async function handler(): Promise<Response> {
 
     for (const evt of dateEvents) {
       const comp = evt.competitions[0];
-      if (comp.status.type.state !== 'pre') continue;
+      const evtState = comp.status.type.state;
+      // Accept pre (upcoming), in (live), and post (completed) — we need team
+      // IDs from all states, including recently-completed past matches
+      if (evtState !== 'pre' && evtState !== 'in' && evtState !== 'post') continue;
 
       const homeC = comp.competitors.find(c => c.homeAway === 'home');
       const awayC = comp.competitors.find(c => c.homeAway === 'away');
