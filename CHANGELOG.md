@@ -4,6 +4,14 @@ All notable changes to WC 2026 Schedule & Standings.
 
 ---
 
+## [1.3.2] — 2026-06-29
+
+### Bug fixes
+
+- **Team names disappearing from bracket and schedule when R32 matches kick off** — Once Round of 32 matches went live, Pass 1 of the score cron wrote score entries without `homeId`/`awayId`. The final Blob merge was a shallow object spread that replaced the entire entry, silently discarding the team IDs that Pass 2 had written before kickoff. Fixed with two complementary changes: (1) the final merge is now a deep per-entry merge so existing team IDs survive when a new entry only carries scores/status; (2) Pass 1 also writes `homeId`/`awayId` when it resolves them, making entries self-contained. ([#38](https://github.com/markcaron/fwc2026/pull/38))
+
+---
+
 ## [1.3.1] — 2026-06-22
 
 ### Bug fixes
