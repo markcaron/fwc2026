@@ -297,6 +297,11 @@ export default async function handler(): Promise<Response> {
       entry.away = awayScore;
     }
 
+    // Also persist team IDs when they resolve — ensures Pass 1 entries for
+    // knockout matches don't lose homeId/awayId written earlier by Pass 2
+    if (hId) entry.homeId = hId;
+    if (aId) entry.awayId = aId;
+
     newScores[String(ourId)] = entry;
   }
 
@@ -384,11 +389,17 @@ export default async function handler(): Promise<Response> {
     }
   }
 
-  // Merge with existing Blobs data so past results are never lost
+  // Deep-merge per match entry so homeId/awayId written by Pass 2 are never
+  // overwritten by a Pass 1 score entry that doesn't carry those fields.
+  // A shallow spread would replace the entire entry, silently losing team IDs.
   const store = getStore('scores');
   const existing = await store.get('latest', { type: 'json' }).catch(() => null) as
-    { scores?: Record<string, unknown> } | null;
-  const merged = { ...(existing?.scores ?? {}), ...newScores };
+    { scores?: Record<string, Record<string, unknown>> } | null;
+  const blobScores = existing?.scores ?? {};
+  const merged: Record<string, Record<string, unknown>> = { ...blobScores };
+  for (const [id, newEntry] of Object.entries(newScores)) {
+    merged[id] = { ...(blobScores[id] ?? {}), ...newEntry };
+  }
 
   await store.setJSON('latest', { updated: new Date().toISOString(), scores: merged });
   console.log(`[fetch-scores] ${Object.keys(newScores).length} updated, ${Object.keys(merged).length} total`);
